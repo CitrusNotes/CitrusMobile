@@ -114,10 +114,14 @@ main() {
     setup_backend_config
     
     echo -e "\n${GREEN}Setup completed successfully!${NC}"
+    # echo -e "\n${YELLOW}To activate the virtual environment, run:${NC}"
+    # echo -e "${GREEN}source backend/venv/bin/activate${NC} (macOS/Linux)"
+    # echo -e "${GREEN}.\venv\Scripts\activate${NC} (Windows)"
     echo -e "\n${BLUE}Next steps:${NC}"
     echo "1. Update the backend/.env file with your database credentials"
     echo "2. Run './run.sh' to start both frontend and backend servers"
     echo "3. Access the application through Expo Go on your device"
+
 }
 
 # Run main function
