@@ -2,6 +2,16 @@
 
 A modern Note Taking application built with Expo (React Native) and Python (FastAPI), with Azure MariaDB integration.
 
+## setup.sh
+
+This script sets up the environment for running the app
+**Please delete 'venv' folder in the Backend folder and .env files in both Backend and CitrusMobileExpo folders if they exist before running this script.
+
+## run.sh
+
+This script runs the app by opening two terminals
+
+
 ## Project Structure
 
 ```
@@ -35,7 +45,6 @@ Backend/
 - File metadata handling
 - Azure MariaDB integration for data persistence
 - Image processing capabilities with OpenCV
-- Data visualization with Matplotlib
 - Numerical computing with NumPy
 
 ## Prerequisites
