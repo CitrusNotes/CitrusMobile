@@ -1,0 +1,33 @@
+# Web Framework
+fastapi==0.109.2
+uvicorn==0.27.1
+python-multipart==0.0.9             # For handling file uploads
+python-jose[cryptography]==3.3.0    # For JWT tokens
+
+# Database
+sqlalchemy==2.0.27
+mysqlclient==2.2.4                  # For MariaDB connection
+alembic==1.13.1                     # For database migrations
+
+# Image Processing and Data Analysis
+opencv-python==4.9.0.80
+numpy==1.26.4
+matplotlib==3.8.3
+
+# Environment Variables
+python-dotenv==1.0.1
+
+# Testing
+pytest==8.0.0
+pytest-asyncio==0.23.5
+httpx==0.26.0                       # For async HTTP requests in tests
+
+# Development Tools
+black==24.1.1                       # Code formatting
+isort==5.13.2                       # Import sorting
+flake8==7.0.0                       # Code linting
+pylint==3.0.3                       # Code analysis
+
+# Security
+passlib[bcrypt]==1.7.4              # Password hashing
+python-jose[cryptography]==3.3.0    # JWT handling 
