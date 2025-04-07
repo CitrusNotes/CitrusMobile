@@ -104,6 +104,21 @@ EOL
     fi
 }
 
+# Function to update React and Expo
+update_react_and_expo() {
+    print_section "Updating React and Expo"
+    
+    # Update React
+    echo "Updating React to the latest version..."
+    npm install react@latest react-dom@latest
+    
+    # Update Expo
+    echo "Updating Expo to the latest version..."
+    npm install expo@latest
+    
+    echo -e "${GREEN}React and Expo updated successfully!${NC}"
+}
+
 # Main setup process
 main() {
     echo -e "${BLUE}Starting CitrusNotes setup...${NC}"
@@ -112,6 +127,7 @@ main() {
     setup_python_env
     setup_frontend
     setup_backend_config
+    update_react_and_expo
     
     echo -e "\n${GREEN}Setup completed successfully!${NC}"
     # echo -e "\n${YELLOW}To activate the virtual environment, run:${NC}"
