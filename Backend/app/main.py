@@ -469,12 +469,12 @@ async def upload_file_to_filesystem(
     """Upload a file to the file system."""
     try:
         # Read the file content
-        f_cont = await file.read() 
+        f_cont = await file.read()
         # Upload the file to GridFS
         file_id = await fs.upload_from_stream(
             file.filename, f_cont, metadata={"content_type": file.content_type}
         )
-        
+
         # Create a new item in the file system
         item = {
             "name": file.filename,
