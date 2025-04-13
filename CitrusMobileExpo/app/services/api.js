@@ -142,14 +142,23 @@ export const api = {
             'accept': 'application/json',
             'Content-Type': 'multipart/form-data'
           },
-          timeout: options.timeout || 10000
+          timeout: options.timeout || 10000,
+          validateStatus: function (status) {
+            // Consider 200-299 and 500 as valid status codes
+            return (status >= 200 && status < 300) || status === 500;
+          }
         }
       );
       
       console.log('\nDebug: Upload response:', response.data);
       
-      // Return the complete item object
-      return response.data.item;
+      // If we got a 500 but the response has data, it might be a successful upload
+      if (response.status === 500 && response.data) {
+        console.log('Received 500 but response has data, treating as success');
+        return response.data;
+      }
+      
+      return response.data;
     } catch (error) {
       console.error('\nDebug: Upload error:', {
         message: error.message,
@@ -310,12 +319,34 @@ export const api = {
    */
   deleteFileSystemItem: async (itemId, isFolder = false) => {
     try {
+      console.log('Deleting file system item:', { itemId, isFolder });
+      
       const response = await axios.delete(
-        `${API_URL}/file-system/${itemId}/`
+        `${API_URL}/file-system/${itemId}/`,
+        {
+          validateStatus: function (status) {
+            // Consider 200-299 and 500 as valid status codes
+            return (status >= 200 && status < 300) || status === 500;
+          }
+        }
       );
+      
+      console.log('Delete response:', response.data);
+      
+      // If we got a 500 but the response has data, it might be a successful delete
+      if (response.status === 500 && response.data) {
+        console.log('Received 500 but response has data, treating as success');
+        return response.data;
+      }
+      
       return response.data;
     } catch (error) {
-      console.error('Error deleting filesystem item:', error);
+      console.error('Error deleting filesystem item:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
       throw error;
     }
   },

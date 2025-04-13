@@ -159,64 +159,50 @@ export default function Library({ route }) {
    * Opens document picker and uploads selected file
    */
   const handleUploadPress = async () => {
-    console.log('Starting file upload process...');
-    toggleMenu();
     try {
-      console.log('Opening document picker...');
+      console.log('Starting file upload process...');
       const result = await DocumentPicker.getDocumentAsync({
         type: '*/*',
-        copyToCacheDirectory: true
+        copyToCacheDirectory: true,
       });
 
-      console.log('Document picker result:', result);
+      if (result.canceled) {
+        console.log('Document picker was canceled');
+        return;
+      }
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const selectedFile = result.assets[0];
-        console.log('Document selected successfully:', selectedFile);
-        
-        // Show loading indicator
-        setLoading(true);
-        
-        // Create a file object with the correct format
-        const file = {
-          uri: selectedFile.uri,
-          type: selectedFile.mimeType || 'application/octet-stream',
-          name: selectedFile.name
-        };
+      const file = result.assets[0];
+      console.log('Document selected successfully:', file);
 
-        console.log('Prepared file object for upload:', file);
-        
-        console.log('Starting file upload to API...');
-        // Upload the file
-        const uploadedItem = await api.uploadFile(
-          file,
-          TEMP_USER_ID,
-          currentFolder,
-          []
-        );
+      const fileObject = {
+        name: file.name,
+        type: file.mimeType,
+        uri: file.uri,
+      };
+      console.log('Prepared file object for upload:', fileObject);
 
-        console.log('Upload response:', uploadedItem);
+      console.log('Starting file upload to API...');
+      const response = await api.uploadFile(
+        fileObject,
+        TEMP_USER_ID,
+        currentFolder?._id || null,
+        []
+      );
 
-        if (uploadedItem) {
-          console.log('File uploaded successfully, refreshing items list...');
-          // Refresh the items list
-          await fetchItems();
-          
-          // Show success message
-          Alert.alert('Success', 'File uploaded successfully');
-        } else {
-          console.error('No response received from API');
-          Alert.alert('Error', 'No response received from server');
-        }
+      console.log('Upload response:', response);
+      
+      if (response && response.item_id) {
+        // Refresh the items list to show the new file
+        await fetchItems();
+        Alert.alert('Success', 'File uploaded successfully');
       } else {
-        console.log('Document picker was cancelled or no file selected');
+        throw new Error('Invalid response from server');
       }
     } catch (error) {
-      console.error('Error in file upload process:', error);
-      Alert.alert('Error', 'Failed to upload file. Please try again.');
+      console.error('Error uploading file:', error);
+      Alert.alert('Error', 'Failed to upload file: ' + error.message);
     } finally {
       console.log('Cleaning up upload process...');
-      setLoading(false);
     }
   };
 
@@ -279,7 +265,7 @@ export default function Library({ route }) {
             const response = await api.uploadFile(
               file,
               TEMP_USER_ID,
-              currentFolder,
+              currentFolder?._id || null,
               [],
               { timeout: 30000 } // Increase timeout to 30 seconds
             );
@@ -743,16 +729,21 @@ export default function Library({ route }) {
         handleFavorite(menuItem);
         handleMenuClose(); // Close the menu
         break;
-      case 'tag':
+      case 'addtag':
         setIsTagModalVisible(true);
         handleMenuClose(); // Close the menu
         break;
-      case 'detail':
+      case 'showdetail':
         handleShowDetail(menuItem);
         handleMenuClose(); // Close the menu
         break;
       case 'delete':
         handleDelete(menuItem);
+        handleMenuClose(); // Close the menu
+        break;
+      case 'rename':
+        setNewName(menuItem.name);
+        setIsRenameModalVisible(true);
         handleMenuClose(); // Close the menu
         break;
       default:
@@ -1144,7 +1135,7 @@ export default function Library({ route }) {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.menuItem}
-                onPress={() => handleMenuAction('addTag')}
+                onPress={() => handleMenuAction('addtag')}
               >
                 <MaterialIcons name="local-offer" size={20} color={colors.text.primary} />
                 <Text style={styles.menuItemText}>Add Tag</Text>
@@ -1158,7 +1149,7 @@ export default function Library({ route }) {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.menuItem}
-                onPress={() => handleMenuAction('showDetail')}
+                onPress={() => handleMenuAction('showdetail')}
               >
                 <MaterialIcons name="info" size={20} color={colors.text.primary} />
                 <Text style={styles.menuItemText}>Show Detail</Text>

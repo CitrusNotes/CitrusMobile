@@ -431,6 +431,14 @@ async def delete_filesystem_item(item_id: str):
         if not item:
             raise HTTPException(status_code=404, detail="Item not found")
 
+        # If it's a folder, recursively delete its contents
+        if item.get("is_folder"):
+            # Find all items with this folder as their parent
+            cursor = file_system.find({"parent_id": ObjectId(item_id)})
+            async for child_item in cursor:
+                # Recursively delete each child item
+                await delete_filesystem_item(str(child_item["_id"]))
+
         # If it's a file (not a folder) and has a gridfs_id, delete from GridFS
         if not item.get("is_folder") and item.get("gridfs_id"):
             try:
@@ -460,15 +468,18 @@ async def upload_file_to_filesystem(
 ):
     """Upload a file to the file system."""
     try:
-        file_id = fs.put(
-            await file.read(),
-            filename=file.filename,
-            content_type=file.content_type,
+        # Read the file content
+        f_cont = await file.read() 
+        # Upload the file to GridFS
+        file_id = await fs.upload_from_stream(
+            file.filename, f_cont, metadata={"content_type": file.content_type}
         )
+        
+        # Create a new item in the file system
         item = {
             "name": file.filename,
             "is_folder": False,
-            "file_id": file_id,
+            "gridfs_id": file_id,
             "parent_id": ObjectId(parent_id) if parent_id else None,
             "tags": tags,
             "user_id": ObjectId(user_id),
