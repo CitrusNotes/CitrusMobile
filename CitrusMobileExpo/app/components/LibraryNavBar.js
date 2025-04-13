@@ -16,7 +16,7 @@ import { colors, typography, spacing } from '../constants/theme';
  * @param {Function} props.getCurrentFolderPath - Function to get the current folder path
  * @returns {JSX.Element} Rendered navigation bar
  */
-const LibraryNavBar = ({ currentFolder, handleBackClick, viewMode, setViewMode, getCurrentFolderPath }) => {
+const LibraryNavBar = ({ currentFolder, handleBackClick, viewMode, setViewMode }) => {
   return (
     <View style={styles.navBar}>
       {currentFolder !== null && (
@@ -25,7 +25,7 @@ const LibraryNavBar = ({ currentFolder, handleBackClick, viewMode, setViewMode, 
         </TouchableOpacity>
       )}
       <Text style={styles.navTitle} numberOfLines={1} ellipsizeMode="tail">
-        {getCurrentFolderPath()}
+        {currentFolder ? currentFolder.name : 'Library'}
       </Text>
       <TouchableOpacity 
         onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} 
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
    */
   navTitle: {
     fontSize: typography.fontSize.xlarge,
-    color: colors.text.primary,
+    color: '#FFFFFF',
     fontFamily: typography.fontFamily.primary,
     fontWeight: 'bold',
   },

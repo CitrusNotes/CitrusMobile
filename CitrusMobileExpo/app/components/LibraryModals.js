@@ -25,6 +25,16 @@ import { colors, typography, spacing } from '../constants/theme';
  * @param {Object} props.selectedItemForDetail - Item to display in detail view
  * @param {Function} props.formatFileSize - Function to format file sizes
  * @param {Function} props.formatDate - Function to format dates
+ * @param {boolean} props.isRenameModalVisible - Controls visibility of rename modal
+ * @param {Function} props.setIsRenameModalVisible - Function to toggle rename modal visibility
+ * @param {string} props.newName - Current value of new name input
+ * @param {Function} props.setNewName - Function to update new name
+ * @param {Function} props.handleRename - Function to handle rename
+ * @param {boolean} props.isMoveModalVisible - Controls visibility of move modal
+ * @param {Function} props.setIsMoveModalVisible - Function to toggle move modal visibility
+ * @param {Array} props.availableFolders - Array of available folders for moving items
+ * @param {Function} props.handleMove - Function to handle moving items
+ * @param {Object} props.currentFolder - Currently selected folder for moving items
  * @returns {JSX.Element} Rendered modals
  */
 const LibraryModals = ({
@@ -44,6 +54,16 @@ const LibraryModals = ({
   selectedItemForDetail,
   formatFileSize,
   formatDate,
+  isRenameModalVisible,
+  setIsRenameModalVisible,
+  newName,
+  setNewName,
+  handleRename,
+  isMoveModalVisible,
+  setIsMoveModalVisible,
+  availableFolders,
+  handleMove,
+  currentFolder,
 }) => {
   return (
     <>
@@ -207,6 +227,96 @@ const LibraryModals = ({
             )}
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Rename Modal */}
+      <Modal
+        visible={isRenameModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsRenameModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Rename {selectedItem?.is_folder ? 'Folder' : 'File'}</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder={`Enter new ${selectedItem?.is_folder ? 'folder' : 'file'} name`}
+              value={newName}
+              onChangeText={(text) => {
+                console.log('Rename input changed:', text);
+                setNewName(text);
+              }}
+              autoFocus={true}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  console.log('Rename cancelled');
+                  setNewName('');
+                  setIsRenameModalVisible(false);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.createButton]}
+                onPress={() => {
+                  console.log('Rename confirmed:', newName);
+                  handleRename();
+                }}
+              >
+                <Text style={styles.createButtonText}>Rename</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Move Modal */}
+      <Modal
+        visible={isMoveModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsMoveModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Move {selectedItem?.is_folder ? 'Folder' : 'File'}</Text>
+            <View style={styles.folderList}>
+              {currentFolder && (
+                <TouchableOpacity
+                  style={styles.folderItem}
+                  onPress={() => handleMove(null)}
+                >
+                  <MaterialIcons name="arrow-upward" size={24} color={colors.text.primary} />
+                  <Text style={styles.folderItemText}>Move to Parent Folder</Text>
+                </TouchableOpacity>
+              )}
+              {availableFolders.map((folder) => (
+                <TouchableOpacity
+                  key={folder._id}
+                  style={styles.folderItem}
+                  onPress={() => handleMove(folder._id)}
+                >
+                  <MaterialIcons name="folder" size={24} color={colors.primary.main} />
+                  <Text style={styles.folderItemText}>{folder.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setIsMoveModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </>
   );
@@ -423,6 +533,26 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontFamily: typography.fontFamily.primary,
     fontSize: typography.fontSize.small,
+  },
+
+  folderList: {
+    maxHeight: 300,
+    width: '100%',
+    marginBottom: 15,
+  },
+
+  folderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+
+  folderItemText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: colors.accent,
   },
 });
 

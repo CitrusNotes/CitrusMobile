@@ -13,15 +13,15 @@ from pymongo import MongoClient
 load_dotenv()
 
 # MongoDB connection string with fallback for local development
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017/citrusnotes")
+MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017/CitrusNotes")
 
 # Create async MongoDB client
 client = AsyncIOMotorClient(MONGODB_URL)
-db = client.citrusnotes
+db = client.CitrusNotes
 
 # Create sync MongoDB client for operations that require it
 sync_client = MongoClient(MONGODB_URL)
-sync_db = sync_client.citrusnotes
+sync_db = sync_client.CitrusNotes
 
 # Define collections
 users = db.users

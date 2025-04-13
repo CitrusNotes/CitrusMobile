@@ -8,7 +8,6 @@ This module provides the main API endpoints for:
 """
 
 import io
-import os
 from datetime import datetime
 from typing import List, Optional
 
@@ -37,10 +36,42 @@ app.add_middleware(
 )
 
 
-# Create database indexes on application startup
+# Function to ensure test user exists
+async def ensure_test_user():
+    """Ensure the test user exists in the database."""
+    test_user_id = "67f7454e9f6072baae1702c1"
+    try:
+        print("\nDebug: Checking for test user with ID: " + test_user_id)
+        user = await users.find_one({"_id": ObjectId(test_user_id)})
+        if not user:
+            print("Debug: Test user not found, creating...")
+            user_data = {
+                "_id": ObjectId(test_user_id),
+                "email": "test@example.com",
+                "hashed_password": pwd_context.hash("testpassword"),
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+            }
+            await users.insert_one(user_data)
+            print("Debug: Test user created successfully")
+        else:
+            print("Debug: Test user already exists")
+    except Exception as e:
+        print("Debug: Error ensuring test user exists: " + str(e))
+
+
+# Create test user on startup
 @app.on_event("startup")
 async def startup_event():
     await create_indexes()
+    await ensure_test_user()
+    # Debug: Print all registered routes
+    print("\nDebug: Registered routes:")
+    for route in app.routes:
+        print("  " + route.path + " - " + str(route.methods))
+        if hasattr(route, "endpoint"):
+            print("    Handler: " + route.endpoint.__name__)
+    print("\n")
 
 
 # User management endpoints
@@ -250,78 +281,52 @@ async def get_image(file_id: str):
         raise HTTPException(status_code=404, detail="Image not found")
 
 
-# File System Endpoints
+# FileSystem endpoints
 @app.post("/file-system/")
-async def create_file_system_item(
-    name: str,
-    path: str,
-    size: float,
-    is_folder: bool = False,
-    parent_id: Optional[str] = None,
-    tags: List[str] = [],
+async def create_filesystem_item(
+    name: str = Form(...),
+    is_folder: bool = Form(False),
+    parent_id: Optional[str] = Form(None),
+    tags: List[str] = Form([]),
     user_id: str = Form(...),
+    is_starred: bool = Form(False),
 ):
-    """Create a new file system item (file or folder).
-
-    Args:
-        name (str): Name of the item
-        path (str): Path of the item
-        size (float): Size of the item (0 for folders)
-        is_folder (bool): Whether the item is a folder
-        parent_id (Optional[str]): ID of the parent folder
-        tags (List[str]): List of tags for the item
-        user_id (str): ID of the user who owns the item
-
-    Returns:
-        dict: Success message and item ID
-
-    Raises:
-        HTTPException: If item creation fails
-    """
+    """Create a new item in the file system."""
     try:
         item = {
             "name": name,
-            "path": path,
-            "size": size,
-            "created_at": datetime.utcnow(),
-            "modified_at": datetime.utcnow(),
-            "is_starred": False,
+            "is_folder": is_folder,
+            "parent_id": ObjectId(parent_id) if parent_id else None,
             "tags": tags,
             "user_id": ObjectId(user_id),
-            "parent_id": ObjectId(parent_id) if parent_id else None,
-            "is_folder": is_folder,
+            "is_starred": is_starred,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
         }
-        result = await file_system.insert_one(item)
-        return {
-            "message": "Item created successfully",
-            "id": str(result.inserted_id),
-        }
+        await file_system.insert_one(item)
+        return {"message": "Creation Success", "item_id": str(item["_id"])}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/file-system/")
-async def list_file_system_items(
+async def list_filesystem_items(
     user_id: str = Query(...),
     parent_id: Optional[str] = Query(None),
     tags: Optional[List[str]] = Query(None),
 ):
-    """List file system items for a user.
-
-    Args:
-        user_id (str): ID of the user
-        parent_id (Optional[str]): ID of the parent folder
-        tags (Optional[List[str]]): Tags to filter by
-
-    Returns:
-        List[dict]: List of file system items
-
-    Raises:
-        HTTPException: If listing fails
-    """
+    """List file system items for a user."""
     try:
+        print(
+            "Debug: Received request with user_id="
+            + user_id
+            + ", parent_id="
+            + str(parent_id)
+        )
+
         # Build query
         query = {"user_id": ObjectId(user_id)}
+        print("Debug: Initial query: " + str(query))
 
         # Handle parent_id
         if parent_id is not None:
@@ -331,14 +336,17 @@ async def list_file_system_items(
                 query["parent_id"] = ObjectId(parent_id)
         else:
             query["parent_id"] = None
+        print("Debug: Final query: " + str(query))
 
         if tags:
             query["tags"] = {"$all": tags}
 
         # Get items
         items = []
+        count = 0
         async for item in file_system.find(query):
             try:
+                count += 1
                 # Convert all ObjectId fields to strings
                 item_dict = dict(item)
                 for key, value in item_dict.items():
@@ -346,410 +354,17 @@ async def list_file_system_items(
                         item_dict[key] = str(value)
                 items.append(item_dict)
             except Exception as e:
-                print(f"Error processing item: {str(e)}")
+                print("Error processing item: " + str(e))
                 continue
 
+        print("Debug: Found " + str(count) + " items matching query")
         return items
     except Exception as e:
-        print(f"Error in list_file_system_items: {str(e)}")
+        print("Error in list_filesystem_items: " + str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.put("/file-system/{item_id}")
-async def update_file_system_item(
-    item_id: str,
-    name: Optional[str] = None,
-    path: Optional[str] = None,
-    is_starred: Optional[bool] = None,
-    tags: Optional[List[str]] = None,
-):
-    """Update a file system item.
-
-    Args:
-        item_id (str): ID of the item to update
-        name (Optional[str]): New name for the item
-        path (Optional[str]): New path for the item
-        is_starred (Optional[bool]): New star status
-        tags (Optional[List[str]]): New tags for the item
-
-    Returns:
-        dict: Success message
-
-    Raises:
-        HTTPException: If update fails or item not found
-    """
-    try:
-        update_data = {"modified_at": datetime.utcnow()}
-        if name is not None:
-            update_data["name"] = name
-        if path is not None:
-            update_data["path"] = path
-        if is_starred is not None:
-            update_data["is_starred"] = is_starred
-        if tags is not None:
-            update_data["tags"] = tags
-
-        result = await file_system.update_one(
-            {"_id": ObjectId(item_id)}, {"$set": update_data}
-        )
-        if result.modified_count == 0:
-            raise HTTPException(status_code=404, detail="Item not found")
-        return {"message": "Item updated successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.delete("/file-system/{item_id}")
-async def delete_file_system_item(item_id: str):
-    """Delete a file system item.
-
-    Args:
-        item_id (str): ID of the item to delete
-
-    Returns:
-        dict: Success message
-
-    Raises:
-        HTTPException: If deletion fails or item not found
-    """
-    try:
-        result = await file_system.delete_one({"_id": ObjectId(item_id)})
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="Item not found")
-        return {"message": "Item deleted successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# File Upload Endpoint
-@app.post("/files/upload/")
-async def upload_file(
-    file: UploadFile = File(...),
-    user_id: str = Form(...),
-    parent_id: Optional[str] = Form(None),
-    tags: List[str] = Form([]),
-):
-    """Upload a file to the system.
-
-    Args:
-        file (UploadFile): The file to upload
-        user_id (str): ID of the user uploading the file
-        parent_id (Optional[str]): ID of the parent folder
-        tags (List[str]): Tags for the file
-
-    Returns:
-        dict: Success message and file IDs
-
-    Raises:
-        HTTPException: If upload fails
-    """
-    try:
-        # Read file content
-        content = await file.read()
-
-        # Upload to GridFS
-        file_id = await fs.upload_from_stream(
-            file.filename,
-            content,
-            metadata={
-                "content_type": file.content_type,
-                "user_id": user_id,
-                "parent_id": parent_id,
-                "tags": tags,
-            },
-        )
-
-        # Create file system item
-        file_item = {
-            "name": file.filename,
-            "path": f"/files/{file.filename}",
-            "size": len(content),
-            "created_at": datetime.utcnow(),
-            "modified_at": datetime.utcnow(),
-            "is_starred": False,
-            "tags": tags,
-            "user_id": ObjectId(user_id),
-            "parent_id": ObjectId(parent_id) if parent_id else None,
-            "is_folder": False,
-            "content_type": file.content_type,
-            "gridfs_id": file_id,
-        }
-
-        # Insert into file_system collection
-        result = await file_system.insert_one(file_item)
-
-        return {
-            "message": "File uploaded successfully",
-            "file_id": str(file_id),
-            "item_id": str(result.inserted_id),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# File Download Endpoint
-@app.get("/files/{file_id}")
-async def download_file(file_id: str):
-    """Download a file by its ID.
-
-    Args:
-        file_id (str): ID of the file to download
-
-    Returns:
-        StreamingResponse: The file as a streaming response
-
-    Raises:
-        HTTPException: If file not found
-    """
-    try:
-        # Get file from GridFS
-        grid_out = await fs.open_download_stream(ObjectId(file_id))
-        if not grid_out:
-            raise HTTPException(status_code=404, detail="File not found")
-
-        # Get file metadata
-        file_metadata = grid_out.metadata
-
-        # Create streaming response
-        return StreamingResponse(
-            io.BytesIO(await grid_out.read()),
-            media_type=file_metadata.get(
-                "content_type",
-                "application/octet-stream",
-            ),
-            headers={
-                "Content-Disposition": (
-                    'attachment; filename="' + grid_out.filename + '"'
-                )
-            },
-        )
-    except ValueError:
-        raise HTTPException(status_code=404, detail="File not found")
-
-
-# List Files Endpoint
-@app.get("/files/")
-async def list_files(
-    user_id: str,
-    parent_id: Optional[str] = None,
-    tags: Optional[List[str]] = Query(None),
-):
-    """List files for a user.
-
-    Args:
-        user_id (str): ID of the user
-        parent_id (Optional[str]): ID of the parent folder
-        tags (Optional[List[str]]): Tags to filter by
-
-    Returns:
-        List[dict]: List of files
-
-    Raises:
-        HTTPException: If listing fails
-    """
-    try:
-        # Build query
-        query = {"user_id": ObjectId(user_id), "is_folder": False}
-        if parent_id:
-            query["parent_id"] = ObjectId(parent_id)
-        if tags:
-            query["tags"] = {"$all": tags}
-
-        files = await file_system.find(query).to_list(length=None)
-        for file in files:
-            file["_id"] = str(file["_id"])
-            if "parent_id" in file and file["parent_id"]:
-                file["parent_id"] = str(file["parent_id"])
-            if "gridfs_id" in file:
-                file["gridfs_id"] = str(file["gridfs_id"])
-        return files
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# Create Folder Endpoint
-@app.post("/folders/")
-async def create_folder(
-    name: str,
-    path: str,
-    user_id: str = Form(...),
-    parent_id: Optional[str] = Form(None),
-    tags: List[str] = Form([]),
-):
-    """Create a new folder.
-
-    Args:
-        name (str): Name of the folder
-        path (str): Path of the folder
-        user_id (str): ID of the user creating the folder
-        parent_id (Optional[str]): ID of the parent folder
-        tags (List[str]): Tags for the folder
-
-    Returns:
-        dict: Success message and folder ID
-
-    Raises:
-        HTTPException: If folder creation fails
-    """
-    try:
-        # Get the correct collection
-        user_collection = users
-
-        folder = {
-            "name": name,
-            "path": path,
-            "size": 0,
-            "created_at": datetime.utcnow(),
-            "modified_at": datetime.utcnow(),
-            "is_starred": False,
-            "tags": tags,
-            "parent_id": parent_id,
-            "is_folder": True,
-        }
-
-        result = await user_collection.insert_one(folder)
-        return {
-            "message": "Folder created successfully",
-            "id": str(result.inserted_id),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# List Folders Endpoint
-@app.get("/folders/")
-async def list_folders(user_id: str, parent_id: Optional[str] = None):
-    """List folders for a user.
-
-    Args:
-        user_id (str): ID of the user
-        parent_id (Optional[str]): ID of the parent folder
-
-    Returns:
-        List[dict]: List of folders
-
-    Raises:
-        HTTPException: If listing fails
-    """
-    try:
-        # Get the correct collection
-        user_collection = users
-
-        query = {"is_folder": True}
-        if parent_id:
-            query["parent_id"] = parent_id
-
-        folders = await user_collection.find(query).to_list(length=None)
-        for folder in folders:
-            folder["_id"] = str(folder["_id"])
-            if "parent_id" in folder and folder["parent_id"]:
-                folder["parent_id"] = str(folder["parent_id"])
-        return folders
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# FileSystem endpoints
-@app.post("/filesystem/")
-async def create_filesystem_item(
-    name: str = Form(...),
-    path: str = Form(...),
-    is_folder: bool = Form(False),
-    parent_id: Optional[str] = Form(None),
-    tags: List[str] = Form([]),
-    user_id: str = Form(...),
-):
-    """Create a new file system item (file or folder).
-
-    Args:
-        name (str): Name of the item
-        path (str): Path of the item
-        is_folder (bool): Whether the item is a folder
-        parent_id (Optional[str]): ID of the parent folder
-        tags (List[str]): Tags for the item
-        user_id (str): ID of the user creating the item
-
-    Returns:
-        dict: Created item data
-
-    Raises:
-        HTTPException: If item creation fails
-    """
-    try:
-        # Create the filesystem item
-        item = {
-            "name": name,
-            "path": path,
-            "is_folder": is_folder,
-            "parent_id": ObjectId(parent_id) if parent_id else None,
-            "tags": tags,
-            "user_id": ObjectId(user_id),
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
-            "size": 0 if is_folder else None,
-        }
-
-        # Insert into database
-        result = await file_system.insert_one(item)
-
-        # Return the created item
-        created_item = await file_system.find_one({"_id": result.inserted_id})
-        created_item["_id"] = str(created_item["_id"])
-        if "parent_id" in created_item and created_item["parent_id"]:
-            created_item["parent_id"] = str(created_item["parent_id"])
-        created_item["user_id"] = str(created_item["user_id"])
-        return created_item
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get("/filesystem/")
-async def list_filesystem_items(
-    user_id: str = Query(...),
-    parent_id: Optional[str] = Query(None),
-    tags: Optional[List[str]] = Query(None),
-):
-    """List file system items for a user.
-
-    Args:
-        user_id (str): ID of the user
-        parent_id (Optional[str]): ID of the parent folder
-        tags (Optional[List[str]]): Tags to filter by
-
-    Returns:
-        List[dict]: List of file system items
-
-    Raises:
-        HTTPException: If listing fails
-    """
-    try:
-        # Build query
-        query = {"user_id": ObjectId(user_id)}
-        if parent_id:
-            query["parent_id"] = ObjectId(parent_id)
-        if tags:
-            query["tags"] = {"$all": tags}
-
-        # Get items
-        items = []
-        async for item in file_system.find(query):
-            try:
-                item["_id"] = str(item["_id"])
-                if "parent_id" in item and item["parent_id"]:
-                    item["parent_id"] = str(item["parent_id"])
-                item["user_id"] = str(item["user_id"])
-                items.append(item)
-            except Exception as e:
-                print(f"Error processing item: {str(e)}")
-                continue
-
-        return items
-    except Exception as e:
-        print(f"Error in list_filesystem_items: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/filesystem/{item_id}")
+@app.get("/file-system/{item_id}")
 async def get_filesystem_item(item_id: str):
     """Get a specific file system item.
 
@@ -776,76 +391,40 @@ async def get_filesystem_item(item_id: str):
         raise HTTPException(status_code=400, detail="Invalid item ID format")
 
 
-@app.put("/filesystem/{item_id}")
+@app.put("/file-system/{item_id}")
 async def update_filesystem_item(
     item_id: str,
     name: Optional[str] = None,
-    path: Optional[str] = None,
+    parent_id: Optional[str] = None,
     tags: Optional[List[str]] = None,
+    is_starred: Optional[bool] = None,
 ):
-    """Update a file system item.
-
-    Args:
-        item_id (str): ID of the item to update
-        name (Optional[str]): New name for the item
-        path (Optional[str]): New path for the item
-        tags (Optional[List[str]]): New tags for the item
-
-    Returns:
-        dict: Updated item data
-
-    Raises:
-        HTTPException: If update fails or item not found
-    """
+    """Update an existing file system item."""
     try:
-        # Build update data
-        update_data = {"updated_at": datetime.utcnow()}
+        update_data = {}
         if name is not None:
             update_data["name"] = name
-            # Set path to "/" + new name
-            update_data["path"] = f"/{name}"
+        if parent_id is not None:
+            update_data["parent_id"] = ObjectId(parent_id)
         if tags is not None:
             update_data["tags"] = tags
+        if is_starred is not None:
+            update_data["is_starred"] = is_starred
+        update_data["updated_at"] = datetime.utcnow()
 
-        # Update item
         result = await file_system.update_one(
             {"_id": ObjectId(item_id)}, {"$set": update_data}
         )
-
         if result.modified_count == 0:
             raise HTTPException(status_code=404, detail="Item not found")
-
-        # Return updated item
-        updated_item = await file_system.find_one({"_id": ObjectId(item_id)})
-        if not updated_item:
-            raise HTTPException(
-                status_code=404,
-                detail="Item not found after update",
-            )
-
-        updated_item["_id"] = str(updated_item["_id"])
-        if "parent_id" in updated_item and updated_item["parent_id"]:
-            updated_item["parent_id"] = str(updated_item["parent_id"])
-        updated_item["user_id"] = str(updated_item["user_id"])
-        return updated_item
+        return {"message": "Item updated successfully"}
     except Exception as e:
-        print(f"Error in patch_filesystem_item: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/filesystem/{item_id}")
+@app.delete("/file-system/{item_id}")
 async def delete_filesystem_item(item_id: str):
-    """Delete a file system item.
-
-    Args:
-        item_id (str): ID of the item to delete
-
-    Returns:
-        dict: Success message
-
-    Raises:
-        HTTPException: If deletion fails or item not found
-    """
+    """Delete a file system item."""
     try:
         # First get the item to check if it has a gridfs_id
         item = await file_system.find_one({"_id": ObjectId(item_id)})
@@ -857,8 +436,8 @@ async def delete_filesystem_item(item_id: str):
             try:
                 await fs.delete(ObjectId(item["gridfs_id"]))
             except Exception as e:
-                print(f"Error deleting from GridFS: {str(e)}")
-                # Continue with file system deletion even if  deletion fails
+                print("Error deleting from GridFS: " + str(e))
+                # Continue even if GridFS deletion fails
 
         # Delete from file system
         result = await file_system.delete_one({"_id": ObjectId(item_id)})
@@ -870,83 +449,60 @@ async def delete_filesystem_item(item_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/filesystem/upload/")
+# File upload endpoint
+@app.post("/file-system/upload/")
 async def upload_file_to_filesystem(
     file: UploadFile = File(...),
     user_id: str = Form(...),
     parent_id: Optional[str] = Form(None),
     tags: List[str] = Form([]),
+    is_starred: bool = Form(False),
 ):
-    """Upload a file to the system.
-
-    Args:
-        file (UploadFile): The file to upload
-        user_id (str): ID of the user uploading the file
-        parent_id (Optional[str]): ID of the parent folder
-        tags (List[str]): Tags for the file
-
-    Returns:
-        dict: Success message and file IDs
-
-    Raises:
-        HTTPException: If upload fails or user not found
-    """
+    """Upload a file to the file system."""
     try:
-        # Validate user
-        user = await get_user(user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        # Create file record
-        file_id = str(ObjectId())
-        file_record = {
-            "_id": file_id,
+        file_id = fs.put(
+            await file.read(),
+            filename=file.filename,
+            content_type=file.content_type,
+        )
+        item = {
             "name": file.filename,
-            "type": "file",
-            "parent_id": parent_id,
-            "user_id": user_id,
+            "is_folder": False,
+            "file_id": file_id,
+            "parent_id": ObjectId(parent_id) if parent_id else None,
             "tags": tags,
+            "user_id": ObjectId(user_id),
+            "is_starred": is_starred,
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow(),
         }
-
-        # Save file to storage
-        file_path = f"uploads/{user_id}/{file_id}"
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
-
-        # Save record to database
-        await file_system.insert_one(file_record)
-
-        return {"message": "File uploaded successfully", "file_id": file_id}
+        await file_system.insert_one(item)
+        return {"message": "Upload Success", "item_id": str(item["_id"])}
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to upload file: {str(e)}",
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/filesystem/download/{file_id}")
+@app.get("/file-system/download/{file_id}")
 async def download_file_from_filesystem(file_id: str):
-    """Download a file by its ID.
-
-    Args:
-        file_id (str): ID of the file to download
-
-    Returns:
-        StreamingResponse: The file as a streaming response
-
-    Raises:
-        HTTPException: If file not found
-    """
+    """Download a file by its ID."""
     try:
+        print("\nDebug: Downloading file with ID: " + file_id)
+
         # Get file from GridFS
-        grid_out = await fs.open_download_stream(ObjectId(file_id))
+        try:
+            grid_out = await fs.open_download_stream(ObjectId(file_id))
+        except ValueError as e:
+            print("Debug: Invalid file ID format: " + str(e))
+            raise HTTPException(status_code=400, detail="Invalid ID format")
+        except Exception as e:
+            print("Debug: Error opening download stream: " + str(e))
+            raise HTTPException(status_code=404, detail="File not found")
 
         # Get file metadata
         file_metadata = grid_out.metadata
+        if not file_metadata:
+            print("Debug: No metadata found for file")
+            file_metadata = {"content_type": "application/octet-stream"}
 
         # Create streaming response
         return StreamingResponse(
@@ -961,5 +517,40 @@ async def download_file_from_filesystem(file_id: str):
                 )
             },
         )
-    except ValueError:
-        raise HTTPException(status_code=404, detail="File not found")
+    except Exception as e:
+        print("Debug: Error in download: " + str(e))
+        raise HTTPException(
+            status_code=500, detail="Failed to download file: " + str(e)
+        )
+
+
+# Debug endpoint to check database contents
+@app.get("/debug/db-check")
+async def debug_db_check(user_id: str = Query(...)):
+    """Debug endpoint to check database state."""
+    try:
+        user_items = await file_system.find({"user_id": ObjectId(user_id)})
+        user_items = await user_items.to_list(length=None)
+        return {
+            "message": "Database check successful",
+            "user_items": [str(item["_id"]) for item in user_items],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Debug endpoint to check user existence
+@app.get("/debug/user/{user_id}")
+async def debug_check_user(user_id: str):
+    """Debug endpoint to check user state."""
+    try:
+        user = await users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {
+            "message": "User check successful",
+            "user_id": str(user["_id"]),
+            "email": user["email"],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

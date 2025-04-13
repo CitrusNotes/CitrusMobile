@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors, typography, spacing } from '../constants/theme';
 import BottomNavBar from '../components/BottomNavBar';
@@ -14,6 +14,7 @@ import LibraryNavBar from '../components/LibraryNavBar';
 import LibraryFAB from '../components/LibraryFAB';
 import LibraryModals from '../components/LibraryModals';
 import { GridItem, ListItem } from '../components/LibraryItems';
+import { MaterialIcons } from '@expo/vector-icons';
 
 // Debug logging
 console.log('Environment variables:', {
@@ -53,74 +54,96 @@ export default function Library({ route }) {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [selectedItemForDetail, setSelectedItemForDetail] = useState(null);
-
-  /**
-   * Fetches library items from the API on component mount
-   * Resets to root folder if route.params.resetToRoot is true
-   */
-  useEffect(() => {
-    if (route.params?.resetToRoot) {
-      setCurrentFolder(null);
-      setFolderStack([]);
-      setSearchQuery('');
-    }
-    fetchItems();
-  }, [currentFolder, route.params?.resetToRoot]);
+  const [menuItem, setMenuItem] = useState(null);
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [isMoveModalVisible, setIsMoveModalVisible] = useState(false);
+  const [availableFolders, setAvailableFolders] = useState([]);
 
   /**
    * Fetches all library items and their contents
    * Handles both root items and items within folders
    */
   const fetchItems = async () => {
-    setLoading(true);
     try {
-      console.log('Current folder ID:', currentFolder);
-      const data = await api.getFileSystemItems(TEMP_USER_ID, currentFolder);
-      console.log('Raw API response data:', JSON.stringify(data, null, 2));
+      setLoading(true);
+      console.log('Fetching items for user:', '67f7454e9f6072baae1702c1');
+      console.log('Current folder:', currentFolder?._id || 'root');
       
-      // Ensure data is an array
-      if (!Array.isArray(data)) {
-        console.error('Expected array but got:', typeof data);
-        setItems([]);
-        return;
-      }
+      const items = await api.getFileSystemItems(
+        '67f7454e9f6072baae1702c1',
+        currentFolder?._id || null
+      );
+      
+      console.log('Fetched items:', items);
       
       // Filter items based on current folder
-      const filteredItems = data.filter(item => {
-        // If we're at root (currentFolder is null), show only items with parent_id: null
-        if (currentFolder === null) {
-          const isRootItem = item.parent_id === null;
-          console.log(`Root Item ${item.name} (${item._id}): parent_id=${item.parent_id}, isRootItem=${isRootItem}, is_folder=${item.is_folder}`);
-          return isRootItem;
-        }
-        // Otherwise, show only items that belong to the current folder
-        const belongsToCurrentFolder = item.parent_id === currentFolder;
-        console.log(`Item ${item.name} (${item._id}): parent_id=${item.parent_id}, currentFolder=${currentFolder}, belongsToCurrentFolder=${belongsToCurrentFolder}, is_folder=${item.is_folder}`);
-        return belongsToCurrentFolder;
-      });
-      
-      console.log('Filtered items:', JSON.stringify(filteredItems, null, 2));
+      const filteredItems = items.filter(item => 
+        currentFolder ? item.parent_id === currentFolder._id : item.parent_id === null
+      );
       
       setItems(filteredItems);
     } catch (error) {
-      console.error('Error loading items:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        url: EXPO_API_URL,
-        errorType: error.constructor.name,
-        errorCode: error.code,
-        currentFolder
-      });
-      Alert.alert(
-        'Error',
-        `Failed to load items: ${error.message}\n\nPlease check if the server is running and accessible.`
-      );
-      setItems([]);
+      console.error('Error fetching items:', error);
+      Alert.alert('Error', 'Failed to fetch items');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  // Initial fetch and reset handling
+  useEffect(() => {
+    console.log('Initial fetch or reset triggered');
+    if (route.params?.resetToRoot) {
+      setCurrentFolder(null);
+      setFolderStack([]);
+      setSearchQuery('');
+    }
+    fetchItems();
+  }, [route.params?.resetToRoot]);
+
+  // Handle folder navigation and updates
+  useEffect(() => {
+    console.log('Folder navigation triggered - currentFolder:', currentFolder);
+    let isMounted = true;
+
+    const fetchItemsWithCleanup = async () => {
+      try {
+        setLoading(true);
+        console.log('Current folder ID:', currentFolder);
+        const items = await api.getFileSystemItems(
+          '67f7454e9f6072baae1702c1',
+          currentFolder ? currentFolder._id : null
+        );
+        if (isMounted) {
+          console.log('Fetched items:', items);
+          setItems(items);
+        }
+      } catch (error) {
+        console.error('Error loading items:', error);
+        console.error('Error details:', {
+          currentFolder,
+          errorCode: error.code,
+          errorType: error.name,
+          message: error.message,
+          stack: error.stack,
+          url: error.config?.url
+        });
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchItemsWithCleanup();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentFolder]);
 
   /**
    * Handles camera button press
@@ -161,29 +184,25 @@ export default function Library({ route }) {
           name: selectedFile.name
         };
 
-        console.log('Prepared file object for upload:', {
-          uri: file.uri,
-          type: file.type,
-          name: file.name,
-          size: selectedFile.size
-        });
+        console.log('Prepared file object for upload:', file);
         
         console.log('Starting file upload to API...');
         // Upload the file
-        const response = await api.uploadFile(
+        const uploadedItem = await api.uploadFile(
           file,
           TEMP_USER_ID,
           currentFolder,
           []
         );
 
-        console.log('API upload response:', response);
+        console.log('Upload response:', uploadedItem);
 
-        if (response) {
+        if (uploadedItem) {
           console.log('File uploaded successfully, refreshing items list...');
           // Refresh the items list
           await fetchItems();
           
+          // Show success message
           Alert.alert('Success', 'File uploaded successfully');
         } else {
           console.error('No response received from API');
@@ -193,11 +212,7 @@ export default function Library({ route }) {
         console.log('Document picker was cancelled or no file selected');
       }
     } catch (error) {
-      console.error('Error in file upload process:', {
-        message: error.message,
-        stack: error.stack,
-        response: error.response?.data
-      });
+      console.error('Error in file upload process:', error);
       Alert.alert('Error', 'Failed to upload file. Please try again.');
     } finally {
       console.log('Cleaning up upload process...');
@@ -342,26 +357,22 @@ export default function Library({ route }) {
     }
 
     try {
-      // Close the modal first to prevent multiple clicks
-      setIsFolderModalVisible(false);
-      
-      // Create the folder
+      setLoading(true);
       await api.createFolder(
-        newFolderName,
-        `/${newFolderName}`,
+        newFolderName.trim(),
         TEMP_USER_ID,
-        currentFolder,
+        currentFolder?._id || null,
         []
       );
-
-      // Reset the folder name
-      setNewFolderName('');
-      
-      // Refresh the items list
       await fetchItems();
+      Alert.alert('Success', 'Folder created successfully');
+      setIsFolderModalVisible(false);
+      setNewFolderName('');
     } catch (error) {
       console.error('Error creating folder:', error);
       Alert.alert('Error', 'Failed to create folder. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -387,14 +398,19 @@ export default function Library({ route }) {
    */
   const handleFolderClick = (folder) => {
     console.log('Folder clicked:', folder);
-    setFolderNames(prev => ({
-      ...prev,
-      [folder._id]: folder.name
-    }));
-    if (currentFolder !== null) {
-      setFolderStack(prev => [...prev, currentFolder]);
+    console.log('Current folder stack before update:', folderStack);
+    
+    // If we're at root, just set the current folder
+    if (currentFolder === null) {
+      setCurrentFolder(folder);
+      setFolderStack([folder]);
+    } else {
+      // Otherwise, add the current folder to the stack
+      setFolderStack([...folderStack, currentFolder]);
+      setCurrentFolder(folder);
     }
-    setCurrentFolder(folder._id);
+    
+    console.log('Updated folder stack:', [...folderStack, currentFolder]);
     setSearchQuery('');
   };
 
@@ -403,15 +419,18 @@ export default function Library({ route }) {
    * Navigates to parent folder
    */
   const handleBackClick = () => {
-    if (folderStack.length > 0) {
-      const newStack = [...folderStack];
-      const parentFolder = newStack.pop();
-      setFolderStack(newStack);
-      setCurrentFolder(parentFolder);
-    } else {
+    console.log('Back clicked - current folder:', currentFolder);
+    if (currentFolder && currentFolder.parent_id === null) {
+      // If we're in a root folder, go back to library home
       setCurrentFolder(null);
+      setFolderStack([]);
+      navigation.setParams({ resetToRoot: true });
+    } else if (folderStack.length > 0) {
+      // Otherwise, go back to previous folder
+      const previousFolder = folderStack[folderStack.length - 1];
+      setCurrentFolder(previousFolder);
+      setFolderStack(folderStack.slice(0, -1));
     }
-    setSearchQuery('');
   };
 
   /**
@@ -428,22 +447,14 @@ export default function Library({ route }) {
         setIsDownloading(true);
         setDownloadProgress(0);
 
-        // Get file metadata if not already available
-        if (!file.fileMetadata) {
-          console.log('Getting file metadata for:', file.gridfs_id);
-          const metadata = await api.getFileMetadata(file.gridfs_id);
-          console.log('File metadata:', metadata);
-          file.fileMetadata = metadata;
-        }
-
         // If it's a PDF, handle it directly
         if (file.content_type === 'application/pdf') {
           console.log('Opening PDF:', file.name, 'with ID:', file.gridfs_id);
           
-          // Download the file
+          // Download the file using the correct endpoint
           setDownloadProgress(0.3);
-          const base64Data = await api.downloadFile(file.gridfs_id);
-          if (!base64Data) {
+          const response = await api.downloadFile(file.gridfs_id);
+          if (!response) {
             throw new Error('No PDF data received');
           }
 
@@ -454,7 +465,7 @@ export default function Library({ route }) {
           
           // Save the PDF to a temporary file
           console.log('Saving PDF to temporary file:', tempFilePath);
-          await FileSystem.writeAsStringAsync(tempFilePath, base64Data, {
+          await FileSystem.writeAsStringAsync(tempFilePath, response, {
             encoding: FileSystem.EncodingType.Base64,
           });
 
@@ -480,54 +491,33 @@ export default function Library({ route }) {
           const response = await api.downloadFile(file.gridfs_id);
           
           setDownloadProgress(0.6);
-          // Create a blob from the response
-          const blob = new Blob([response], { type: file.content_type || 'application/octet-stream' });
+          // Create a temporary file with a unique name
+          const tempDir = FileSystem.cacheDirectory;
+          const uniqueFileName = `${Date.now()}-${file.name}`;
+          const tempFilePath = `${tempDir}${uniqueFileName}`;
           
-          // Convert blob to base64
-          const reader = new FileReader();
-          reader.readAsDataURL(blob);
+          // Save the file temporarily
+          await FileSystem.writeAsStringAsync(tempFilePath, response, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
           
-          reader.onloadend = async () => {
-            const base64Data = reader.result.split(',')[1];
-            
-            try {
-              setDownloadProgress(0.8);
-              // Create a temporary file with a unique name
-              const tempDir = FileSystem.cacheDirectory;
-              const uniqueFileName = `${Date.now()}-${file.name}`;
-              const tempFile = `${tempDir}${uniqueFileName}`;
-              
-              // Save the file temporarily
-              await FileSystem.writeAsStringAsync(tempFile, base64Data, {
-                encoding: FileSystem.EncodingType.Base64,
-              });
-              
-              setDownloadProgress(0.9);
-              // Share the file (this will open the system's share sheet)
-              await Sharing.shareAsync(tempFile, {
-                mimeType: file.content_type || 'application/octet-stream',
-                dialogTitle: `Save ${file.name}`,
-                UTI: file.content_type || 'public.data'
-              });
-              
-              // Clean up the temporary file after sharing
-              try {
-                const fileInfo = await FileSystem.getInfoAsync(tempFile);
-                if (fileInfo.exists) {
-                  await FileSystem.deleteAsync(tempFile);
-                }
-              } catch (cleanupError) {
-                console.warn('Error cleaning up temporary file:', cleanupError);
-              }
-              
-            } catch (error) {
-              console.error('Error saving file:', error);
-              Alert.alert(
-                'Error',
-                `Failed to save file: ${error.message}`
-              );
+          setDownloadProgress(0.9);
+          // Share the file (this will open the system's share sheet)
+          await Sharing.shareAsync(tempFilePath, {
+            mimeType: file.content_type || 'application/octet-stream',
+            dialogTitle: `Save ${file.name}`,
+            UTI: file.content_type || 'public.data'
+          });
+          
+          // Clean up the temporary file after sharing
+          try {
+            const fileInfo = await FileSystem.getInfoAsync(tempFilePath);
+            if (fileInfo.exists) {
+              await FileSystem.deleteAsync(tempFilePath);
             }
-          };
+          } catch (cleanupError) {
+            console.warn('Error cleaning up temporary file:', cleanupError);
+          }
         }
       } catch (error) {
         console.error('Error handling file:', error);
@@ -536,8 +526,11 @@ export default function Library({ route }) {
           `Failed to handle file: ${error.message}\n\nPlease try again later.`
         );
       } finally {
+        // Ensure we reset all states
         setIsDownloading(false);
         setDownloadProgress(0);
+        setLoading(false);
+        setIsMenuOpen(false);
       }
     }
   };
@@ -594,35 +587,10 @@ export default function Library({ route }) {
    * Handles pull-to-refresh functionality
    * Refreshes the items list
    */
-  const onRefresh = React.useCallback(async () => {
+  const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    try {
-      // Use a separate loading state for pull-to-refresh
-      const data = await api.getFileSystemItems(TEMP_USER_ID, currentFolder);
-      
-      // Ensure data is an array
-      if (!Array.isArray(data)) {
-        console.error('Expected array but got:', typeof data);
-        setItems([]);
-        return;
-      }
-      
-      // Filter items based on current folder
-      const filteredItems = data.filter(item => {
-        if (currentFolder === null) {
-          return item.parent_id === null;
-        }
-        return item.parent_id === currentFolder;
-      });
-      
-      setItems(filteredItems);
-    } catch (error) {
-      console.error('Error refreshing items:', error);
-      Alert.alert('Error', 'Failed to refresh items');
-    } finally {
-      setRefreshing(false);
-    }
-  }, [currentFolder]);
+    fetchItems();
+  }, []);
 
   // Filter items based on search query
   const filteredItems = items.filter(item => {
@@ -665,8 +633,8 @@ export default function Library({ route }) {
    * @returns {string} Current folder path
    */
   const getCurrentFolderPath = () => {
-    if (currentFolder === null) return 'Library';
-    return folderNames[currentFolder] || 'Folder';
+    if (!currentFolder) return 'Library';
+    return currentFolder.name;
   };
 
   /**
@@ -740,6 +708,193 @@ export default function Library({ route }) {
     setSelectedItemForDetail(null);
   };
 
+  const handleMenuOpen = (item, position = null) => {
+    setMenuItem(item);
+    if (position) {
+      setMenuPosition(position);
+    }
+  };
+
+  const handleMenuClose = () => {
+    setMenuItem(null);
+  };
+
+  const handleMenuAction = (action) => {
+    if (!menuItem) {
+      console.error('No menu item selected');
+      return;
+    }
+
+    setSelectedItem(menuItem);
+    
+    switch (action) {
+      case 'move':
+        // Filter folders that have the same parent_id as the current item
+        const siblingFolders = items.filter(item => 
+          item.is_folder && 
+          item._id !== menuItem._id && 
+          item.parent_id === menuItem.parent_id
+        );
+        setAvailableFolders(siblingFolders);
+        setIsMoveModalVisible(true);
+        handleMenuClose(); // Close the menu
+        break;
+      case 'favorite':
+        handleFavorite(menuItem);
+        handleMenuClose(); // Close the menu
+        break;
+      case 'tag':
+        setIsTagModalVisible(true);
+        handleMenuClose(); // Close the menu
+        break;
+      case 'detail':
+        handleShowDetail(menuItem);
+        handleMenuClose(); // Close the menu
+        break;
+      case 'delete':
+        handleDelete(menuItem);
+        handleMenuClose(); // Close the menu
+        break;
+      default:
+        console.error('Unknown menu action:', action);
+        handleMenuClose(); // Close the menu
+    }
+  };
+
+  const handleRename = async () => {
+    try {
+      console.log('Attempting to rename item:', {
+        selectedItem,
+        newName,
+        isRenameModalVisible
+      });
+
+      if (!selectedItem) {
+        console.error('No item selected for renaming');
+        Alert.alert('Error', 'No item selected for renaming');
+        return;
+      }
+
+      if (!newName || newName.trim() === '') {
+        console.error('Invalid name provided');
+        Alert.alert('Error', 'Please enter a valid name');
+        return;
+      }
+
+      setLoading(true);
+      
+      try {
+        // Use the API service to rename the item
+        const updatedItem = await api.updateFileSystemItem(selectedItem._id, {
+          name: newName.trim()
+        });
+
+        console.log('Item renamed successfully:', updatedItem);
+
+        // Refresh the items list
+        await fetchItems();
+
+        // Show success message
+        Alert.alert('Success', `${selectedItem.is_folder ? 'Folder' : 'File'} renamed successfully`);
+
+        // Reset state
+        setNewName('');
+        setIsRenameModalVisible(false);
+        setSelectedItem(null);
+      } catch (error) {
+        console.error('Error in handleRename:', error);
+        // Check if the error is a 500 but the rename actually succeeded
+        if (error.response?.status === 500) {
+          // Try to refresh the items list to confirm
+          await fetchItems();
+          const items = await api.getFileSystemItems('67f7454e9f6072baae1702c1', currentFolder?._id || null);
+          const renamedItem = items.find(item => item._id === selectedItem._id);
+          if (renamedItem && renamedItem.name === newName.trim()) {
+            // The rename actually succeeded despite the 500 error
+            Alert.alert('Success', `${selectedItem.is_folder ? 'Folder' : 'File'} renamed successfully`);
+            setNewName('');
+            setIsRenameModalVisible(false);
+            setSelectedItem(null);
+            return;
+          }
+        }
+        // If we get here, the rename actually failed
+        Alert.alert('Error', `Failed to rename ${selectedItem.is_folder ? 'folder' : 'file'}: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Unexpected error in handleRename:', error);
+      Alert.alert('Error', 'An unexpected error occurred while renaming the item');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMove = async (targetFolderId) => {
+    try {
+      console.log('Moving item to:', {
+        currentFolder,
+        targetFolderId,
+        selectedItem
+      });
+
+      // First remove the parent_id field
+      await api.updateFileSystemItem(selectedItem._id, {
+        parent_id: undefined
+      });
+
+      // Then add the new parent_id
+      if (targetFolderId === null) {
+        // Moving to parent folder
+        if (currentFolder && currentFolder.parent_id) {
+          // If current folder has a parent, move to that parent
+          await api.updateFileSystemItem(selectedItem._id, {
+            parent_id: currentFolder.parent_id
+          });
+        }
+        // If current folder has no parent (is root), we don't need to set parent_id
+        // as it's already removed in the first step
+      } else {
+        // Moving to a specific folder
+        await api.updateFileSystemItem(selectedItem._id, {
+          parent_id: targetFolderId
+        });
+      }
+
+      // Refresh the items list
+      await fetchItems();
+      
+      // Close the move modal
+      setIsMoveModalVisible(false);
+      
+      Alert.alert('Success', 'Item moved successfully');
+    } catch (error) {
+      console.error('Error moving item:', error);
+      Alert.alert('Error', 'Failed to move item');
+    }
+  };
+
+  const handleFavorite = async (item) => {
+    try {
+      console.log('Toggling favorite status for item:', item);
+      
+      // Toggle the is_starred status
+      const newStarredStatus = !item.is_starred;
+      
+      // Update the item
+      await api.updateFileSystemItem(item._id, {
+        is_starred: newStarredStatus
+      });
+      
+      // Refresh the items list
+      await fetchItems();
+      
+      Alert.alert('Success', newStarredStatus ? 'Added to favorites' : 'Removed from favorites');
+    } catch (error) {
+      console.error('Error toggling favorite status:', error);
+      Alert.alert('Error', 'Failed to update favorite status');
+    }
+  };
+
   if (loading && !refreshing) {
     return (
       <View style={styles.container}>
@@ -810,6 +965,10 @@ export default function Library({ route }) {
                         key={folder._id} 
                         item={folder} 
                         onPress={handleFileClick}
+                        onLongPress={() => {}}
+                        onMenuPress={() => {}}
+                        onMenuOpen={handleMenuOpen}
+                        onMenuClose={handleMenuClose}
                         handleDelete={handleDelete}
                         handleShowDetail={handleShowDetail}
                         setSelectedItem={setSelectedItem}
@@ -830,6 +989,10 @@ export default function Library({ route }) {
                         key={file._id} 
                         item={file} 
                         onPress={handleFileClick}
+                        onLongPress={() => {}}
+                        onMenuPress={() => {}}
+                        onMenuOpen={handleMenuOpen}
+                        onMenuClose={handleMenuClose}
                         handleDelete={handleDelete}
                         handleShowDetail={handleShowDetail}
                         setSelectedItem={setSelectedItem}
@@ -852,6 +1015,10 @@ export default function Library({ route }) {
                       key={folder._id} 
                       item={folder} 
                       onPress={handleFileClick}
+                      onLongPress={() => {}}
+                      onMenuPress={() => {}}
+                      onMenuOpen={handleMenuOpen}
+                      onMenuClose={handleMenuClose}
                       handleDelete={handleDelete}
                       handleShowDetail={handleShowDetail}
                       setSelectedItem={setSelectedItem}
@@ -870,6 +1037,10 @@ export default function Library({ route }) {
                       key={file._id} 
                       item={file} 
                       onPress={handleFileClick}
+                      onLongPress={() => {}}
+                      onMenuPress={() => {}}
+                      onMenuOpen={handleMenuOpen}
+                      onMenuClose={handleMenuClose}
                       handleDelete={handleDelete}
                       handleShowDetail={handleShowDetail}
                       setSelectedItem={setSelectedItem}
@@ -912,6 +1083,17 @@ export default function Library({ route }) {
         selectedItemForDetail={selectedItemForDetail}
         formatFileSize={formatFileSize}
         formatDate={formatDate}
+        isRenameModalVisible={isRenameModalVisible}
+        setIsRenameModalVisible={setIsRenameModalVisible}
+        newName={newName}
+        setNewName={setNewName}
+        handleRename={handleRename}
+        isMoveModalVisible={isMoveModalVisible}
+        setIsMoveModalVisible={setIsMoveModalVisible}
+        availableFolders={availableFolders}
+        handleMove={handleMove}
+        currentFolder={currentFolder}
+        handleFavorite={handleFavorite}
       />
 
       {/* Floating Action Button */}
@@ -923,6 +1105,75 @@ export default function Library({ route }) {
         handleImageUploadPress={handleImageUploadPress}
         navigation={navigation}
       />
+
+      {/* Menu Overlay */}
+      {menuItem && (
+        <View style={styles.menuOverlay}>
+          <TouchableOpacity
+            style={styles.overlayTouchable}
+            activeOpacity={1}
+            onPress={handleMenuClose}
+          >
+            <View style={[
+              styles.menuContainer,
+              menuPosition && {
+                position: 'absolute',
+                top: menuPosition.y + 30,
+                left: menuPosition.x - 100,
+              }
+            ]}>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('move')}
+              >
+                <MaterialIcons name="drive-file-move" size={20} color={colors.text.primary} />
+                <Text style={styles.menuItemText}>Move</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('favorite')}
+              >
+                <MaterialIcons 
+                  name={menuItem.is_starred ? "star" : "star-border"} 
+                  size={20} 
+                  color="white" 
+                />
+                <Text style={styles.menuItemText}>
+                  {menuItem.is_starred ? "Remove from Favorites" : "Add to Favorites"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('addTag')}
+              >
+                <MaterialIcons name="local-offer" size={20} color={colors.text.primary} />
+                <Text style={styles.menuItemText}>Add Tag</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('rename')}
+              >
+                <MaterialIcons name="edit" size={20} color={colors.text.primary} />
+                <Text style={styles.menuItemText}>Rename</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('showDetail')}
+              >
+                <MaterialIcons name="info" size={20} color={colors.text.primary} />
+                <Text style={styles.menuItemText}>Show Detail</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('delete')}
+              >
+                <MaterialIcons name="delete" size={20} color={colors.error} />
+                <Text style={[styles.menuItemText, { color: colors.error }]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -1065,5 +1316,49 @@ const styles = StyleSheet.create({
   downloadProgress: {
     color: 'white',
     fontSize: typography.fontSize.small,
+  },
+
+  menuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 1000,
+  },
+
+  overlayTouchable: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  menuContainer: {
+    backgroundColor: colors.background.primary,
+    borderRadius: 10,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 2,
+  },
+
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    minWidth: 120,
+  },
+
+  menuItemText: {
+    marginLeft: 8,
+    fontSize: typography.fontSize.medium,
+    color: colors.text.primary,
   },
 });
