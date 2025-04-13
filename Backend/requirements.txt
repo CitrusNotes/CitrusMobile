@@ -1,13 +1,13 @@
 # Web Framework
 fastapi==0.109.2
 uvicorn==0.27.1
-python-multipart==0.0.9             # For handling file uploads
-python-jose[cryptography]==3.3.0    # For JWT tokens
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.9
 
 # Database
-sqlalchemy==2.0.27
-mysqlclient==2.2.4                  # For MariaDB connection
-alembic==1.13.1                     # For database migrations
+motor==3.3.2                        # Async MongoDB driver
+pymongo==4.6.1                      # MongoDB Python driver (includes GridFS)
 
 # Image Processing and Data Analysis
 opencv-python==4.9.0.80
@@ -17,16 +17,28 @@ numpy==1.26.4
 python-dotenv==1.0.1
 
 # Testing
-pytest==8.0.0
-pytest-asyncio==0.23.5
-httpx==0.26.0                       # For async HTTP requests in tests
+pytest==7.4.3
+httpx==0.25.2                       # For async HTTP requests in tests
 
 # Development Tools
 black==24.1.1                       # Code formatting
 isort==5.13.2                       # Import sorting
 flake8==7.0.0                       # Code linting
 pylint==3.0.3                       # Code analysis
+pylint-django==2.5.5                # Django plugin for pylint
+pylint-pytest==1.1.2                # Pytest plugin for pylint
+astroid==3.0.2                      # Required by pylint
+dill==0.3.8                         # Required by pylint
+mccabe==0.7.0                       # Required by pylint
+platformdirs==4.2.0                 # Required by pylint
+tomlkit==0.12.4                     # Required by pylint
 
 # Security
-passlib[bcrypt]==1.7.4              # Password hashing
-python-jose[cryptography]==3.3.0    # JWT handling 
+python-jose[cryptography]==3.3.0    # JWT handling
+passlib[bcrypt]==1.7.4             # Password hashing
+
+# Email Validation
+email-validator==2.1.0.post1
+
+# New dependencies
+aiofiles==23.2.1 

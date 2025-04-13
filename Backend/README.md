@@ -2,7 +2,7 @@
 
 ## Updating the `.env` File
 
-To configure the backend application, you need to update the `backend/.env` file with your database credentials. Follow these steps:
+To configure the backend application, you need to update the `backend/.env` file with your MongoDB credentials. Follow these steps:
 
 1. **Locate the `.env` File**:
    - Navigate to the `backend` directory of your project.
@@ -11,14 +11,15 @@ To configure the backend application, you need to update the `backend/.env` file
 2. **Open the `.env` File**:
    - Use a text editor of your choice to open the `backend/.env` file.
 
-3. **Update Database Credentials**:
-   - Find the line that starts with `DATABASE_URL`. It should look like this:
+3. **Update MongoDB Credentials**:
+   - Find the line that starts with `MONGODB_URL`. It should look like this:
      ```
-     DATABASE_URL=mysql://user:password@localhost:3306/citrusnotes
+     MONGODB_URL=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
      ```
-   - Replace `user`, `password`, and `localhost:3306/citrusnotes` with your actual database username, password, host, and database name. For example:
+   - Replace `<username>`, `<password>`, and `<cluster>` with your actual MongoDB Atlas credentials.
+   - For local MongoDB, use:
      ```
-     DATABASE_URL=mysql://myuser:mypassword@myhost:3306/mydatabase
+     MONGODB_URL=mongodb://localhost:27017/citrusnotes
      ```
 
 4. **Save the Changes**:
@@ -28,5 +29,6 @@ To configure the backend application, you need to update the `backend/.env` file
    - If your backend server is running, restart it to apply the changes.
 
 ### Important Notes
-- Ensure that your database server is running and accessible from your application.
+- Ensure that your MongoDB server is running and accessible from your application.
 - Keep your credentials secure and do not share them publicly.
+- For MongoDB Atlas, make sure your IP address is whitelisted in the network access settings.
