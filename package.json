@@ -1,7 +1,15 @@
 {
   "dependencies": {
+    "@config-plugins/react-native-blob-util": "^9.0.0",
+    "@config-plugins/react-native-pdf": "^9.0.0",
     "expo": "^52.0.44",
+    "expo-camera": "~16.0.18",
+    "expo-image-picker": "~16.0.6",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "react-native-blob-util": "^0.21.2",
+    "react-native-pdf": "^6.7.7",
+    "react-native-webview": "^13.13.5",
+    "expo-file-system": "~18.0.12"
   }
 }

@@ -7,3 +7,8 @@ __pycache__/
 .DS_Store
 Thumbs.db
 /node_modules
+/.expo
+CitrusMobileExpo/package-lock.json
+package-lock.json
+package-lock.json
+package-lock.json

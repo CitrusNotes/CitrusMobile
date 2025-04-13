@@ -1,20 +1,21 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import AppNavigator from './app/navigation/AppNavigator';
 
+/**
+ * Main application component that serves as the root of the React Native application.
+ * 
+ * This component sets up the basic application structure including:
+ * - Status bar configuration
+ * - Navigation system initialization
+ * 
+ * @component
+ * @returns {JSX.Element} The root application component with status bar and navigation
+ */
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
+    <>
       <StatusBar style="auto" />
-    </View>
+      <AppNavigator />
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

@@ -1,0 +1,75 @@
+{
+  "currentPath": "/",
+  "items": [
+    {
+      "_id": "1",
+      "name": "Documents",
+      "path": "/Documents",
+      "is_folder": true,
+      "created_at": "2024-03-15T10:00:00Z",
+      "modified_at": "2024-03-15T10:00:00Z",
+      "size": 0,
+      "parent_id": null,
+      "tags": []
+    },
+    {
+      "_id": "2",
+      "name": "Images",
+      "path": "/Images",
+      "is_folder": true,
+      "created_at": "2024-03-15T10:00:00Z",
+      "modified_at": "2024-03-15T10:00:00Z",
+      "size": 0,
+      "parent_id": null,
+      "tags": []
+    },
+    {
+      "_id": "3",
+      "name": "Project Proposal.pdf",
+      "path": "/Project Proposal.pdf",
+      "is_folder": false,
+      "created_at": "2024-03-15T10:00:00Z",
+      "modified_at": "2024-03-15T10:00:00Z",
+      "size": 1024,
+      "parent_id": null,
+      "content_type": "application/pdf",
+      "tags": []
+    },
+    {
+      "_id": "4",
+      "name": "Meeting Notes.pdf",
+      "path": "/Meeting Notes.pdf",
+      "is_folder": false,
+      "created_at": "2024-03-15T10:00:00Z",
+      "modified_at": "2024-03-15T10:00:00Z",
+      "size": 512,
+      "parent_id": null,
+      "content_type": "application/pdf",
+      "tags": []
+    },
+    {
+      "_id": "5",
+      "name": "Document 1.pdf",
+      "path": "/Documents/Document 1.pdf",
+      "is_folder": false,
+      "created_at": "2024-03-15T10:00:00Z",
+      "modified_at": "2024-03-15T10:00:00Z",
+      "size": 768,
+      "parent_id": "1",
+      "content_type": "application/pdf",
+      "tags": []
+    },
+    {
+      "_id": "6",
+      "name": "Image 1.jpg",
+      "path": "/Images/Image 1.jpg",
+      "is_folder": false,
+      "created_at": "2024-03-15T10:00:00Z",
+      "modified_at": "2024-03-15T10:00:00Z",
+      "size": 2048,
+      "parent_id": "2",
+      "content_type": "image/jpeg",
+      "tags": []
+    }
+  ]
+} 
