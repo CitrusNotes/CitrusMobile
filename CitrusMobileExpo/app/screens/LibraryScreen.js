@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, RefreshControl, TouchableOpacity, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors, typography, spacing } from '../constants/theme';
 import BottomNavBar from '../components/BottomNavBar';
@@ -15,15 +15,13 @@ import LibraryFAB from '../components/LibraryFAB';
 import LibraryModals from '../components/LibraryModals';
 import { GridItem, ListItem } from '../components/LibraryItems';
 import { MaterialIcons } from '@expo/vector-icons';
+import { auth } from '../services/auth';
 
 // Debug logging
 console.log('Environment variables:', {
   EXPO_API_URL,
   processEnv: process.env.EXPO_API_URL
 });
-
-// Temporary user ID - TODO: Replace with actual user authentication
-const TEMP_USER_ID = '67f7454e9f6072baae1702c1';
 
 /**
  * Main component for displaying and managing the library of files and folders
@@ -60,21 +58,31 @@ export default function Library({ route }) {
   const [newName, setNewName] = useState('');
   const [isMoveModalVisible, setIsMoveModalVisible] = useState(false);
   const [availableFolders, setAvailableFolders] = useState([]);
+  const [isDeleteTagModalVisible, setIsDeleteTagModalVisible] = useState(false);
+  const [tagToDelete, setTagToDelete] = useState('');
+  const [userId, setUserId] = useState(null);
+
+  useEffect(() => {
+    const loadUserId = async () => {
+      const id = await auth.getCurrentUserId();
+      setUserId(id);
+    };
+    loadUserId();
+  }, []);
 
   /**
    * Fetches all library items and their contents
    * Handles both root items and items within folders
    */
   const fetchItems = async () => {
+    if (!userId) return;
+    
     try {
       setLoading(true);
-      console.log('Fetching items for user:', '67f7454e9f6072baae1702c1');
+      console.log('Fetching items for user:', userId);
       console.log('Current folder:', currentFolder?._id || 'root');
       
-      const items = await api.getFileSystemItems(
-        '67f7454e9f6072baae1702c1',
-        currentFolder?._id || null
-      );
+      const items = await api.getFileSystemItems(userId, currentFolder?._id || null);
       
       console.log('Fetched items:', items);
       
@@ -95,14 +103,15 @@ export default function Library({ route }) {
 
   // Initial fetch and reset handling
   useEffect(() => {
-    console.log('Initial fetch or reset triggered');
-    if (route.params?.resetToRoot) {
+    console.log('Navigation params changed:', route.params);
+    if (route.params?.parent_id === null) {
+      console.log('Resetting to root directory');
       setCurrentFolder(null);
       setFolderStack([]);
       setSearchQuery('');
     }
     fetchItems();
-  }, [route.params?.resetToRoot]);
+  }, [route.params]);
 
   // Handle folder navigation and updates
   useEffect(() => {
@@ -112,11 +121,8 @@ export default function Library({ route }) {
     const fetchItemsWithCleanup = async () => {
       try {
         setLoading(true);
-        console.log('Current folder ID:', currentFolder);
-        const items = await api.getFileSystemItems(
-          '67f7454e9f6072baae1702c1',
-          currentFolder ? currentFolder._id : null
-        );
+        console.log('Current folder ID:', currentFolder?.id);
+        const items = await api.getFileSystemItems(userId, currentFolder ? currentFolder._id : null);
         if (isMounted) {
           console.log('Fetched items:', items);
           setItems(items);
@@ -143,7 +149,7 @@ export default function Library({ route }) {
     return () => {
       isMounted = false;
     };
-  }, [currentFolder]);
+  }, [currentFolder, userId]);
 
   /**
    * Handles camera button press
@@ -184,7 +190,7 @@ export default function Library({ route }) {
       console.log('Starting file upload to API...');
       const response = await api.uploadFile(
         fileObject,
-        TEMP_USER_ID,
+        userId,
         currentFolder?._id || null,
         []
       );
@@ -264,7 +270,7 @@ export default function Library({ route }) {
             // Upload the image with increased timeout
             const response = await api.uploadFile(
               file,
-              TEMP_USER_ID,
+              userId,
               currentFolder?._id || null,
               [],
               { timeout: 30000 } // Increase timeout to 30 seconds
@@ -346,7 +352,7 @@ export default function Library({ route }) {
       setLoading(true);
       await api.createFolder(
         newFolderName.trim(),
-        TEMP_USER_ID,
+        userId,
         currentFolder?._id || null,
         []
       );
@@ -571,12 +577,21 @@ export default function Library({ route }) {
 
   /**
    * Handles pull-to-refresh functionality
-   * Refreshes the items list
+   * Refreshes the items list for the current folder
    */
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
+    console.log('Refreshing folder:', {
+      currentFolder: currentFolder?.name || 'root',
+      folderId: currentFolder?._id || null
+    });
     setRefreshing(true);
-    fetchItems();
-  }, []);
+    try {
+      await fetchItems();
+    } catch (error) {
+      console.error('Error refreshing:', error);
+      Alert.alert('Error', 'Failed to refresh. Please try again.');
+    }
+  }, [currentFolder, userId]);
 
   // Filter items based on search query
   const filteredItems = items.filter(item => {
@@ -647,32 +662,6 @@ export default function Library({ route }) {
   };
 
   /**
-   * Handles adding a tag to an item
-   * @param {Object} item - The item to add the tag to
-   */
-  const handleAddTag = async (item) => {
-    if (!newTag.trim()) {
-      Alert.alert('Error', 'Please enter a tag');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const updatedTags = [...(item.tags || []), newTag.trim()];
-      await api.updateFileSystemItem(item._id, { tags: updatedTags });
-      await fetchItems();
-      Alert.alert('Success', 'Tag added successfully');
-      setIsTagModalVisible(false);
-      setNewTag('');
-    } catch (error) {
-      console.error('Error adding tag:', error);
-      Alert.alert('Error', 'Failed to add tag');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
    * Handles showing item details
    * @param {Object} item - The item to show details for
    * @param {Function} [setShowMenu] - Optional function to close menu
@@ -695,10 +684,19 @@ export default function Library({ route }) {
   };
 
   const handleMenuOpen = (item, position = null) => {
+    setSelectedItem(item);
     setMenuItem(item);
     if (position) {
       setMenuPosition(position);
     }
+
+    // Set available folders for move operation
+    const foldersAtSameLevel = items.filter(i => 
+      i.is_folder && 
+      i._id !== item._id && // Don't include the current folder
+      i.parent_id === (currentFolder ? currentFolder._id : null) // Same parent as current folder
+    );
+    setAvailableFolders(foldersAtSameLevel);
   };
 
   const handleMenuClose = () => {
@@ -706,43 +704,37 @@ export default function Library({ route }) {
   };
 
   const handleMenuAction = (action) => {
-    if (!menuItem) {
-      console.error('No menu item selected');
-      return;
-    }
-
-    setSelectedItem(menuItem);
-    
     switch (action) {
       case 'move':
-        // Filter folders that have the same parent_id as the current item
-        const siblingFolders = items.filter(item => 
-          item.is_folder && 
-          item._id !== menuItem._id && 
-          item.parent_id === menuItem.parent_id
-        );
-        setAvailableFolders(siblingFolders);
         setIsMoveModalVisible(true);
         handleMenuClose(); // Close the menu
         break;
       case 'favorite':
-        handleFavorite(menuItem);
+        handleFavorite(selectedItem);
         handleMenuClose(); // Close the menu
         break;
-      case 'addtag':
+      case 'tag':
         setIsTagModalVisible(true);
         handleMenuClose(); // Close the menu
         break;
-      case 'showdetail':
-        handleShowDetail(menuItem);
+      case 'deleteTag':
+        if (!selectedItem?.tags?.length) {
+          Alert.alert('Info', 'No tags exist for this item');
+        } else {
+          setIsDeleteTagModalVisible(true);
+        }
+        handleMenuClose(); // Close the menu
+        break;
+      case 'detail':
+        handleShowDetail(selectedItem);
         handleMenuClose(); // Close the menu
         break;
       case 'delete':
-        handleDelete(menuItem);
+        handleDelete(selectedItem);
         handleMenuClose(); // Close the menu
         break;
       case 'rename':
-        setNewName(menuItem.name);
+        setNewName(selectedItem.name);
         setIsRenameModalVisible(true);
         handleMenuClose(); // Close the menu
         break;
@@ -798,7 +790,7 @@ export default function Library({ route }) {
         if (error.response?.status === 500) {
           // Try to refresh the items list to confirm
           await fetchItems();
-          const items = await api.getFileSystemItems('67f7454e9f6072baae1702c1', currentFolder?._id || null);
+          const items = await api.getFileSystemItems(userId, currentFolder?._id || null);
           const renamedItem = items.find(item => item._id === selectedItem._id);
           if (renamedItem && renamedItem.name === newName.trim()) {
             // The rename actually succeeded despite the 500 error
@@ -828,22 +820,19 @@ export default function Library({ route }) {
         selectedItem
       });
 
-      // First remove the parent_id field
-      await api.updateFileSystemItem(selectedItem._id, {
-        parent_id: undefined
-      });
-
-      // Then add the new parent_id
+      // If targetFolderId is null, we're moving to parent
       if (targetFolderId === null) {
-        // Moving to parent folder
-        if (currentFolder && currentFolder.parent_id) {
-          // If current folder has a parent, move to that parent
+        // If we're in a root folder, move to root (null)
+        if (currentFolder && currentFolder.parent_id === null) {
+          await api.updateFileSystemItem(selectedItem._id, {
+            parent_id: "null"
+          });
+        } else if (currentFolder) {
+          // Otherwise, move to current folder's parent
           await api.updateFileSystemItem(selectedItem._id, {
             parent_id: currentFolder.parent_id
           });
         }
-        // If current folder has no parent (is root), we don't need to set parent_id
-        // as it's already removed in the first step
       } else {
         // Moving to a specific folder
         await api.updateFileSystemItem(selectedItem._id, {
@@ -883,6 +872,70 @@ export default function Library({ route }) {
     } catch (error) {
       console.error('Error toggling favorite status:', error);
       Alert.alert('Error', 'Failed to update favorite status');
+    }
+  };
+
+  const handleAddTag = async (item) => {
+    try {
+      if (!newTag.trim()) {
+        Alert.alert('Error', 'Tag name cannot be empty');
+        return;
+      }
+
+      // Get current tags or initialize empty array and convert to lowercase
+      const currentTags = (item.tags || []).map(tag => tag.toLowerCase());
+      const newTagLower = newTag.trim().toLowerCase();
+      
+      // Check if tag already exists (case-insensitive)
+      if (currentTags.includes(newTagLower)) {
+        Alert.alert('Error', 'This tag already exists');
+        return;
+      }
+
+      // Add new tag to the array (in lowercase)
+      const updatedTags = [...currentTags, newTagLower];
+
+      // Update the item with new tags
+      await api.updateFileSystemItem(item._id, { tags: updatedTags });
+
+      // Refresh the items list
+      await fetchItems();
+
+      // Reset and close modal
+      setNewTag('');
+      setIsTagModalVisible(false);
+
+      Alert.alert('Success', 'Tag added successfully');
+    } catch (error) {
+      console.error('Error adding tag:', error);
+      Alert.alert('Error', 'Failed to add tag');
+    }
+  };
+
+  const handleDeleteTag = async (item, tag) => {
+    try {
+      if (!item || !item.tags || item.tags.length === 0) {
+        Alert.alert('Error', 'No tags to delete');
+        return;
+      }
+
+      // Remove the specified tag from the array
+      const updatedTags = item.tags.filter(t => t !== tag);
+
+      // Update the item with new tags
+      await api.updateFileSystemItem(item._id, { tags: updatedTags });
+
+      // Refresh the items list
+      await fetchItems();
+
+      // Close modal
+      setIsDeleteTagModalVisible(false);
+      setTagToDelete('');
+
+      Alert.alert('Success', 'Tag deleted successfully');
+    } catch (error) {
+      console.error('Error deleting tag:', error);
+      Alert.alert('Error', 'Failed to delete tag');
     }
   };
 
@@ -1135,11 +1188,22 @@ export default function Library({ route }) {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.menuItem}
-                onPress={() => handleMenuAction('addtag')}
+                onPress={() => handleMenuAction('tag')}
               >
                 <MaterialIcons name="local-offer" size={20} color={colors.text.primary} />
                 <Text style={styles.menuItemText}>Add Tag</Text>
               </TouchableOpacity>
+
+              {selectedItem?.tags?.length > 0 && (
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={() => handleMenuAction('deleteTag')}
+                >
+                  <MaterialIcons name="delete" size={20} color={colors.text.primary} />
+                  <Text style={styles.menuItemText}>Delete Tag</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity 
                 style={styles.menuItem}
                 onPress={() => handleMenuAction('rename')}
@@ -1149,7 +1213,7 @@ export default function Library({ route }) {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.menuItem}
-                onPress={() => handleMenuAction('showdetail')}
+                onPress={() => handleMenuAction('detail')}
               >
                 <MaterialIcons name="info" size={20} color={colors.text.primary} />
                 <Text style={styles.menuItemText}>Show Detail</Text>
@@ -1165,6 +1229,39 @@ export default function Library({ route }) {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Delete Tag Modal */}
+      <Modal
+        visible={isDeleteTagModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsDeleteTagModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Delete Tag</Text>
+            <View style={styles.tagList}>
+              {selectedItem?.tags?.map((tag, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.tagItem}
+                  onPress={() => handleDeleteTag(selectedItem, tag)}
+                >
+                  <Text style={styles.tagText}>{tag}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setIsDeleteTagModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1309,6 +1406,9 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.small,
   },
 
+  /**
+   * Menu overlay style
+   */
   menuOverlay: {
     position: 'absolute',
     top: 0,
@@ -1319,12 +1419,18 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
 
+  /**
+   * Touchable overlay style
+   */
   overlayTouchable: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
+  /**
+   * Menu container style
+   */
   menuContainer: {
     backgroundColor: colors.background.primary,
     borderRadius: 10,
@@ -1340,6 +1446,9 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
 
+  /**
+   * Menu item style
+   */
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1347,9 +1456,103 @@ const styles = StyleSheet.create({
     minWidth: 120,
   },
 
+  /**
+   * Menu item text style
+   */
   menuItemText: {
     marginLeft: 8,
     fontSize: typography.fontSize.medium,
     color: colors.text.primary,
+  },
+
+  /**
+   * Modal overlay style
+   */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  /**
+   * Modal content style
+   */
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+    maxHeight: '80%',
+  },
+
+  /**
+   * Modal title style
+   */
+  modalTitle: {
+    fontSize: typography.fontSize.large,
+    color: colors.accent,
+    fontFamily: typography.fontFamily.primary,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: 20,
+  },
+
+  /**
+   * Tag list style
+   */
+  tagList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+
+  /**
+   * Tag item style
+   */
+  tagItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    backgroundColor: colors.primary.main,
+    borderRadius: 5,
+    margin: 5,
+  },
+
+  /**
+   * Tag text style
+   */
+  tagText: {
+    marginLeft: 5,
+    fontSize: typography.fontSize.medium,
+    color: 'white',
+    textAlign: 'center',
+  },
+
+  /**
+   * Modal buttons style
+   */
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 20,
+  },
+
+  /**
+   * Cancel button style
+   */
+  cancelButton: {
+    backgroundColor: colors.error,
+    padding: 10,
+    borderRadius: 5,
+  },
+
+  /**
+   * Cancel button text style
+   */
+  cancelButtonText: {
+    fontSize: typography.fontSize.medium,
+    color: 'white',
+    fontWeight: 'bold',
   },
 });

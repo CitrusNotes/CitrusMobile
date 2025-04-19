@@ -1,3 +1,7 @@
+# Email Validation (must be installed before pydantic)
+email-validator==2.1.0.post1        # Required for pydantic email validation
+dnspython==2.5.0                    # Required by email-validator
+
 # Web Framework
 fastapi==0.109.2
 uvicorn==0.27.1
@@ -12,6 +16,7 @@ pymongo==4.6.1                      # MongoDB Python driver (includes GridFS)
 # Image Processing and Data Analysis
 opencv-python==4.9.0.80
 numpy==1.26.4
+img2pdf==0.5.1                      # PDF creation from images
 
 # Environment Variables
 python-dotenv==1.0.1
@@ -36,9 +41,6 @@ tomlkit==0.12.4                     # Required by pylint
 # Security
 python-jose[cryptography]==3.3.0    # JWT handling
 passlib[bcrypt]==1.7.4             # Password hashing
-
-# Email Validation
-email-validator==2.1.0.post1
 
 # New dependencies
 aiofiles==23.2.1 

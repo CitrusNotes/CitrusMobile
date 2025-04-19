@@ -17,7 +17,7 @@ export default function WelcomeScreen() {
     <TouchableOpacity 
       style={styles.welcomeScreen}
       activeOpacity={1}
-      onPress={() => navigation.replace('Library')}
+      onPress={() => navigation.replace('SignIn')}
     >
       <Text style={styles.mainHeading}>Welcome to Citrus!</Text>
       <View style={styles.emojiContainer}>

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, typography, spacing } from '../constants/theme';
+import { useNavigation } from '@react-navigation/native';
 
 /**
  * LibraryNavBar component that provides navigation controls for the Library screen.
@@ -17,26 +18,53 @@ import { colors, typography, spacing } from '../constants/theme';
  * @returns {JSX.Element} Rendered navigation bar
  */
 const LibraryNavBar = ({ currentFolder, handleBackClick, viewMode, setViewMode }) => {
+  const navigation = useNavigation();
+
+  /**
+   * Handles user sign out
+   * Navigates back to the sign-in screen
+   */
+  const handleSignOut = () => {
+    navigation.replace('SignIn');
+  };
+
   return (
     <View style={styles.navBar}>
-      {currentFolder !== null && (
-        <TouchableOpacity onPress={handleBackClick} style={styles.backButton}>
-          <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
-      )}
-      <Text style={styles.navTitle} numberOfLines={1} ellipsizeMode="tail">
-        {currentFolder ? currentFolder.name : 'Library'}
-      </Text>
-      <TouchableOpacity 
-        onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} 
-        style={styles.viewToggleButton}
-      >
-        <MaterialIcons 
-          name={viewMode === 'grid' ? 'view-list' : 'grid-view'} 
-          size={24} 
-          color={colors.text.primary} 
-        />
-      </TouchableOpacity>
+      <View style={styles.controlsContainer}>
+        {/* Left control section - Back button or Sign out */}
+        <View style={styles.leftControl}>
+          {currentFolder !== null ? (
+            <TouchableOpacity onPress={handleBackClick} style={styles.controlButton}>
+              <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={handleSignOut} style={styles.controlButton}>
+              <MaterialIcons name="logout" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Center section - Current folder name */}
+        <View style={styles.centerControl}>
+          <Text style={styles.navTitle} numberOfLines={1} ellipsizeMode="tail">
+            {currentFolder ? currentFolder.name : 'Library'}
+          </Text>
+        </View>
+
+        {/* Right control section - View mode toggle */}
+        <View style={styles.rightControl}>
+          <TouchableOpacity 
+            onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} 
+            style={styles.controlButton}
+          >
+            <MaterialIcons 
+              name={viewMode === 'grid' ? 'view-list' : 'grid-view'} 
+              size={24} 
+              color={colors.text.primary} 
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 };
@@ -52,39 +80,62 @@ const styles = StyleSheet.create({
   navBar: {
     height: '12%',
     backgroundColor: colors.background.primary,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
-    paddingBottom: 8,
+    justifyContent: 'flex-end',
+    paddingBottom: spacing.sm,
   },
 
   /**
-   * Style for navigation title showing current path
+   * Style for controls container
+   */
+  controlsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+  },
+
+  /**
+   * Style for left control
+   */
+  leftControl: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+
+  /**
+   * Style for center control
+   */
+  centerControl: {
+    flex: 2,
+    alignItems: 'center',
+  },
+
+  /**
+   * Style for right control
+   */
+  rightControl: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+
+  /**
+   * Style for navigation title
    */
   navTitle: {
     fontSize: typography.fontSize.xlarge,
     color: '#FFFFFF',
     fontFamily: typography.fontFamily.primary,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
 
   /**
-   * Style for back button
+   * Style for control button
    */
-  backButton: {
-    position: 'absolute',
-    left: spacing.md,
-    bottom: spacing.sm,
-  },
-  
-  /**
-   * Style for view mode toggle button
-   */
-  viewToggleButton: {
-    position: 'absolute',
-    right: spacing.md,
-    bottom: spacing.sm,
+  controlButton: {
+    padding: spacing.sm,
   },
 });
 

@@ -28,6 +28,7 @@ const LibraryFAB = ({
 }) => {
   return (
     <>
+      {/* Overlay to handle background touch when menu is open */}
       {isMenuOpen && (
         <TouchableOpacity 
           style={styles.fullScreenOverlay}
@@ -35,9 +36,12 @@ const LibraryFAB = ({
           onPress={() => setIsMenuOpen(false)}
         />
       )}
+      
+      {/* Main FAB container */}
       <View style={styles.fabContainer}>
         {isMenuOpen ? (
           <View style={styles.menuContainer}>
+            {/* Add Folder option */}
             <TouchableOpacity 
               style={styles.menuItem}
               onPress={() => {
@@ -48,6 +52,8 @@ const LibraryFAB = ({
               <MaterialIcons name="create-new-folder" size={24} color={colors.text.primary} />
               <Text style={styles.menuItemText}>Add Folder</Text>
             </TouchableOpacity>
+
+            {/* Upload File option */}
             <TouchableOpacity 
               style={styles.menuItem}
               onPress={() => {
@@ -58,6 +64,8 @@ const LibraryFAB = ({
               <MaterialIcons name="file-upload" size={24} color={colors.text.primary} />
               <Text style={styles.menuItemText}>Upload File</Text>
             </TouchableOpacity>
+
+            {/* Upload Image option */}
             <TouchableOpacity 
               style={styles.menuItem}
               onPress={() => {
@@ -68,11 +76,13 @@ const LibraryFAB = ({
               <MaterialIcons name="image" size={24} color={colors.text.primary} />
               <Text style={styles.menuItemText}>Upload Image</Text>
             </TouchableOpacity>
+
+            {/* Camera option */}
             <TouchableOpacity 
               style={styles.menuItem}
               onPress={() => {
                 setIsMenuOpen(false);
-                navigation.navigate('CameraScreen');
+                navigation.navigate('Camera');
               }}
             >
               <MaterialIcons name="camera-alt" size={24} color={colors.text.primary} />
@@ -80,15 +90,12 @@ const LibraryFAB = ({
             </TouchableOpacity>
           </View>
         ) : (
+          // Main FAB button
           <TouchableOpacity 
             style={styles.fabButton}
             onPress={() => setIsMenuOpen(true)}
           >
-            <MaterialIcons 
-              name="add" 
-              size={32} 
-              color={colors.text.primary} 
-            />
+            <MaterialIcons name="add" size={24} color={colors.text.primary} />
           </TouchableOpacity>
         )}
       </View>

@@ -1,13 +1,14 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-
-// Import screen components
 import WelcomeScreen from '../screens/WelcomeScreen';
+import SignInScreen from '../screens/SignInScreen';
+import SignUpScreen from '../screens/SignUpScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import FavoriteScreen from '../screens/FavoriteScreen';
 import CameraScreen from '../screens/CameraScreen';
 import ScanScreen from '../screens/ScanScreen';
+import { colors } from '../constants/theme';
 
 /**
  * Creates a stack navigator instance
@@ -25,41 +26,55 @@ const Stack = createNativeStackNavigator();
 export default function AppNavigator() {
   return (
     <NavigationContainer>
-      <Stack.Navigator 
-        initialRouteName="Welcome" 
-        screenOptions={{ 
-          headerShown: false,
-          animation: 'none'
-        }}
-      >
+      <Stack.Navigator initialRouteName="Welcome">
         {/* Welcome Screen - Initial landing page */}
         <Stack.Screen 
           name="Welcome" 
           component={WelcomeScreen}
+          options={{ headerShown: false }}
+        />
+
+        {/* Sign In Screen - Modal for signing in */}
+        <Stack.Screen 
+          name="SignIn" 
+          component={SignInScreen}
+          options={{ headerShown: false }}
+        />
+
+        {/* Sign Up Screen - Modal for creating account */}
+        <Stack.Screen 
+          name="SignUp" 
+          component={SignUpScreen}
+          options={{ headerShown: false }}
         />
 
         {/* Library Screen - Main file management interface */}
         <Stack.Screen 
           name="Library" 
           component={LibraryScreen}
-          options={{ title: 'My Library' }}
+          options={{ headerShown: false }}
         />
 
         {/* Favorites Screen - Displays starred/favorite items */}
         <Stack.Screen 
           name="FavoriteScreen" 
           component={FavoriteScreen}
-          options={{ title: 'Favorites' }}
+          options={{ 
+            title: 'Favorites',
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+            headerShown: false 
+          }}
         />
 
         {/* Camera Screen - Modal for capturing photos */}
         <Stack.Screen 
-          name="CameraScreen" 
+          name="Camera" 
           component={CameraScreen}
           options={{ 
-            title: 'Camera',
             presentation: 'modal',
-            animation: 'slide_from_bottom'
+            animation: 'slide_from_bottom',
+            headerShown: false
           }}
         />
 
@@ -68,12 +83,11 @@ export default function AppNavigator() {
           name="ScanScreen" 
           component={ScanScreen}
           options={{ 
-            title: 'Scan',
             presentation: 'modal',
-            animation: 'slide_from_bottom'
+            animation: 'slide_from_bottom',
+            headerShown: false
           }}
         />
-        
       </Stack.Navigator>
     </NavigationContainer>
   );

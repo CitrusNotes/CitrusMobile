@@ -292,7 +292,7 @@ const LibraryModals = ({
                   style={styles.folderItem}
                   onPress={() => handleMove(null)}
                 >
-                  <MaterialIcons name="arrow-upward" size={24} color={colors.text.primary} />
+                  <MaterialIcons name="arrow-upward" size={24} color={colors.primary.main} />
                   <Text style={styles.folderItemText}>Move to Parent Folder</Text>
                 </TouchableOpacity>
               )}
@@ -535,12 +535,18 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.small,
   },
 
+  /**
+   * Style for folder list
+   */
   folderList: {
     maxHeight: 300,
     width: '100%',
     marginBottom: 15,
   },
 
+  /**
+   * Style for folder item
+   */
   folderItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -549,6 +555,9 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border.light,
   },
 
+  /**
+   * Style for folder item text
+   */
   folderItemText: {
     marginLeft: 10,
     fontSize: 16,

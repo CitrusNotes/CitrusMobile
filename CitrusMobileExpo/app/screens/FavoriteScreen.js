@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert 
 import { useNavigation } from '@react-navigation/native';
 import { colors, typography, spacing } from '../constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
-import BottomNavBar from '../components/BottomNavBar';
 import { api } from '../services/api';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -255,6 +254,10 @@ export default function FolderListView() {
   const [loading, setLoading] = useState(true);
   const searchInputRef = useRef(null);
 
+  const handleBack = () => {
+    navigation.goBack();
+  };
+
   /**
    * Fetches favorite items from the API on component mount
    */
@@ -457,6 +460,9 @@ export default function FolderListView() {
     <View style={styles.container}>
       {/* Navigation Bar */}
       <View style={styles.navBar}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
+        </TouchableOpacity>
         <Text style={styles.navTitle}>Favorites</Text>
       </View>
 
@@ -506,9 +512,6 @@ export default function FolderListView() {
           )}
         </View>
       </ScrollView>
-
-      {/* Bottom Navigation Bar */}
-      <BottomNavBar activeScreen="FavoriteScreen" />
     </View>
   );
 }
@@ -530,13 +533,24 @@ const styles = StyleSheet.create({
    * Navigation bar style
    */
   navBar: {
-    height: '12%',
+    height: 60,
     backgroundColor: colors.background.primary,
-    justifyContent: 'flex-end',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
-    paddingBottom: 8,
+    position: 'relative',
+  },
+
+  /**
+   * Back button style
+   */
+  backButton: {
+    position: 'absolute',
+    left: spacing.md,
+    height: '100%',
+    justifyContent: 'center',
   },
 
   /**

@@ -39,6 +39,14 @@ check_prerequisites() {
         echo -e "${RED}Python 3 is not installed. Please install Python 3.8 or later.${NC}"
         exit 1
     fi
+
+    # Check if Homebrew is installed (for macOS)
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        if ! command -v brew >/dev/null 2>&1; then
+            echo -e "${RED}Homebrew is not installed. Please install Homebrew first.${NC}"
+            exit 1
+        fi
+    fi
     
     echo -e "${GREEN}All prerequisites are met!${NC}"
 }
@@ -74,13 +82,25 @@ setup_python_env() {
     # Upgrade pip to latest version
     echo "Upgrading pip..."
     python -m pip install --upgrade pip
+
+    # Install system dependencies for Pillow on macOS
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "Installing system dependencies for Pillow..."
+        brew install libjpeg zlib libtiff webp little-cms2 2>/dev/null || true
+    fi
+    
+    # Install critical packages first
+    echo "Installing critical dependencies..."
+    pip install --only-binary :all: Pillow==10.2.0
+    pip install email-validator==2.1.0.post1
+    pip install "pydantic[email]"==2.6.1
     
     # Install MongoDB drivers and other core dependencies
     echo "Installing MongoDB drivers and core dependencies..."
     pip install motor pymongo python-dotenv fastapi uvicorn passlib python-multipart
     
     # Install Python dependencies from requirements.txt
-    echo "Installing Python dependencies..."
+    echo "Installing remaining Python dependencies..."
     pip install -r requirements.txt
     
     cd ..
@@ -102,7 +122,7 @@ setup_frontend() {
 
     # Install core frontend dependencies
     echo "Installing frontend dependencies..."
-    npm install axios react-native-dotenv
+    npm install axios react-native-dotenv @react-native-async-storage/async-storage
     
     # Configure babel for environment variables
     echo "Configuring babel for react-native-dotenv..."

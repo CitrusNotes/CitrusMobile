@@ -58,6 +58,7 @@ export const colors = {
 
 /**
  * Typography settings for the application
+ * Defines font families, sizes, and weights
  * @type {Object}
  */
 export const typography = {
@@ -71,7 +72,7 @@ export const typography = {
    * Font sizes
    */
   fontSize: {
-    small: 14,
+    small: 12,
     medium: 16,
     large: 20,
     xlarge: 24,
@@ -88,6 +89,7 @@ export const typography = {
 
 /**
  * Spacing constants for consistent layout
+ * Used for margins, padding, and gaps
  * @type {Object}
  */
 export const spacing = {

@@ -8,6 +8,8 @@ This module provides the main API endpoints for:
 """
 
 import io
+import logging
+import os
 from datetime import datetime
 from typing import List, Optional
 
@@ -16,15 +18,27 @@ from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from passlib.context import CryptContext
+from pydantic import BaseModel
 
-from . import models
 from .database import create_indexes, db, file_system, fs, users
+from .utils.imageScan import ProcessImagesIntoPDF
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI application
 app = FastAPI()
 
 # Password hashing configuration
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,
+    bcrypt__ident="2b",
+    bcrypt__min_rounds=4,
+    bcrypt__max_rounds=31,
+)
 
 # Configure CORS middleware for cross-origin requests
 app.add_middleware(
@@ -76,43 +90,62 @@ async def startup_event():
 
 # User management endpoints
 @app.post("/users/")
-async def create_user(user: models.UserCreate):
+async def create_user(email: str = Form(...), password: str = Form(...)):
     """Create a new user in the system.
 
     Args:
-        user (models.UserCreate): User creation data including email
-        and password
+        email (str): User's email from form data
+        password (str): User's password from form data
 
     Returns:
         dict: Created user data (without password)
 
     Raises:
-        HTTPException: If email is already registered
+        HTTPException: If email is already registered or invalid
     """
-    # Check if user already exists
-    existing_user = await users.find_one({"email": user.email})
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    try:
+        # Basic email validation
+        if "@" not in email or "." not in email:
+            raise HTTPException(status_code=422, detail="Invalid email format")
 
-    # Hash the password
-    hashed_password = pwd_context.hash(user.password)
+        # Check if user already exists
+        existing_user = await users.find_one({"email": email})
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Already registered")
 
-    # Create user document
-    user_dict = user.dict()
-    user_dict.pop("password")  # Remove password from the dict
-    user_dict["hashed_password"] = hashed_password
-    user_dict["created_at"] = datetime.utcnow()
-    user_dict["updated_at"] = datetime.utcnow()
+        # Password validation
+        if len(password) < 6:
+            raise HTTPException(
+                status_code=422, detail="Password Length >= 6 characters"
+            )
 
-    # Insert into database
-    result = await users.insert_one(user_dict)
+        # Hash the password
+        hashed_password = pwd_context.hash(password)
 
-    # Return the created user (without password)
-    created_user = await users.find_one({"_id": result.inserted_id})
+        # Create user document
+        user_data = {
+            "email": email,
+            "hashed_password": hashed_password,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+        }
 
-    # Convert ObjectId to string
-    created_user["_id"] = str(created_user["_id"])
-    return created_user
+        # Insert into database
+        result = await users.insert_one(user_data)
+
+        # Return the created user (without password)
+        created_user = await users.find_one({"_id": result.inserted_id})
+        created_user["_id"] = str(created_user["_id"])
+        created_user.pop("hashed_password", None)
+
+        return created_user
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error creating user: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="Failed to create user. Please try again."
+        )
 
 
 @app.get("/users/")
@@ -152,6 +185,48 @@ async def get_user(user_id: str):
         return user
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid user ID format")
+
+
+@app.post("/users/login")
+async def login_user(email: str = Form(...), password: str = Form(...)):
+    """Login a user with email and password.
+
+    Args:
+        email (str): User's email
+        password (str): User's password
+
+    Returns:
+        dict: User data if login successful
+
+    Raises:
+        HTTPException: If login fails with specific error message
+    """
+    try:
+        # Find user by email
+        user = await users.find_one({"email": email})
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        # Verify password
+        if not pwd_context.verify(password, user["hashed_password"]):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        # Convert ObjectId to string for JSON response
+        user["_id"] = str(user["_id"])
+
+        # Remove sensitive data
+        user.pop("hashed_password", None)
+
+        return user
+    except HTTPException as he:
+        # Re-raise HTTP exceptions as they contain proper status codes
+        raise he
+    except Exception as e:
+        print(f"Unexpected error in login: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred. Please try again later.",
+        )
 
 
 # Document management endpoints
@@ -319,11 +394,19 @@ async def list_filesystem_items(
     try:
         print(
             "Debug: Received request with user_id="
-            + user_id
+            + str(user_id)
             + ", parent_id="
             + str(parent_id)
         )
 
+        # Validate user_id
+        if user_id.lower() == "null":
+            return {"error": "Invalid user_id: cannot be null"}, 400
+    except Exception as e:
+        print("Error in list_filesystem_items: " + str(e))
+        return {"error": str(e)}, 500
+
+    try:
         # Build query
         query = {"user_id": ObjectId(user_id)}
         print("Debug: Initial query: " + str(query))
@@ -333,10 +416,13 @@ async def list_filesystem_items(
             if parent_id.lower() == "null":
                 query["parent_id"] = None
             else:
-                query["parent_id"] = ObjectId(parent_id)
+                try:
+                    query["parent_id"] = ObjectId(parent_id)
+                except ValueError:
+                    return {"error": "Invalid parent_id format"}, 400
         else:
             query["parent_id"] = None
-        print("Debug: Final query: " + str(query))
+            print("Debug: Final query: " + str(query))
 
         if tags:
             query["tags"] = {"$all": tags}
@@ -357,11 +443,11 @@ async def list_filesystem_items(
                 print("Error processing item: " + str(e))
                 continue
 
-        print("Debug: Found " + str(count) + " items matching query")
+            print("Debug: Found " + str(count) + " items matching query")
         return items
     except Exception as e:
         print("Error in list_filesystem_items: " + str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}, 500
 
 
 @app.get("/file-system/{item_id}")
@@ -405,7 +491,15 @@ async def update_filesystem_item(
         if name is not None:
             update_data["name"] = name
         if parent_id is not None:
-            update_data["parent_id"] = ObjectId(parent_id)
+            if parent_id.lower() == "null":
+                update_data["parent_id"] = None
+            else:
+                try:
+                    update_data["parent_id"] = ObjectId(parent_id)
+                except ValueError:
+                    raise HTTPException(
+                        status_code=400, detail="Invalid parent_id format"
+                    )
         if tags is not None:
             update_data["tags"] = tags
         if is_starred is not None:
@@ -417,7 +511,7 @@ async def update_filesystem_item(
         )
         if result.modified_count == 0:
             raise HTTPException(status_code=404, detail="Item not found")
-        return {"message": "Item updated successfully"}
+        return {"message": "Update successful"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -497,22 +591,19 @@ async def upload_file_to_filesystem(
 async def download_file_from_filesystem(file_id: str):
     """Download a file by its ID."""
     try:
-        print("\nDebug: Downloading file with ID: " + file_id)
+        logger.debug(f"Downloading file with ID: {file_id}")
 
         # Get file from GridFS
         try:
             grid_out = await fs.open_download_stream(ObjectId(file_id))
         except ValueError as e:
-            print("Debug: Invalid file ID format: " + str(e))
+            logger.error(f"Invalid file ID format: {str(e)}")
             raise HTTPException(status_code=400, detail="Invalid ID format")
-        except Exception as e:
-            print("Debug: Error opening download stream: " + str(e))
-            raise HTTPException(status_code=404, detail="File not found")
 
         # Get file metadata
         file_metadata = grid_out.metadata
         if not file_metadata:
-            print("Debug: No metadata found for file")
+            logger.warning("No metadata found for file")
             file_metadata = {"content_type": "application/octet-stream"}
 
         # Create streaming response
@@ -529,7 +620,7 @@ async def download_file_from_filesystem(file_id: str):
             },
         )
     except Exception as e:
-        print("Debug: Error in download: " + str(e))
+        logger.error(f"Error in download: {str(e)}")
         raise HTTPException(
             status_code=500, detail="Failed to download file: " + str(e)
         )
@@ -564,4 +655,43 @@ async def debug_check_user(user_id: str):
             "email": user["email"],
         }
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ImageProcessRequest(BaseModel):
+    images: List[bytes]
+    filename: str
+    user_id: str
+
+
+@app.post("/process-images")
+async def process_images(request: ImageProcessRequest):
+    """Process multiple images into a PDF document.
+
+    Args:
+        request (ImageProcessRequest): Request containing images and metadata
+
+    Returns:
+        dict: Success message and document ID
+
+    Raises:
+        HTTPException: If processing fails
+    """
+    try:
+        # Create temp directory if it doesn't exist
+        os.makedirs("temp", exist_ok=True)
+
+        # Process images and create PDF
+        file_id = await ProcessImagesIntoPDF(
+            request.images, request.filename, request.user_id
+        )
+
+        return {
+            "message": "PDF created successfully",
+            "item_id": file_id,
+            "success": True,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to process images: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

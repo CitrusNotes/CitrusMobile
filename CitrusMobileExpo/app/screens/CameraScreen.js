@@ -1,4 +1,5 @@
-import { CameraView, Camera } from 'expo-camera';
+import { CameraView } from 'expo-camera';
+import { Camera } from 'expo-camera';
 import { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -51,7 +52,11 @@ export default function CameraScreen() {
    * Toggles flash mode between on and off
    */
   const toggleFlash = () => {
-    setFlashMode((current) => (current === "off" ? "on" : "off"));
+    console.log('Current flash mode:', flashMode);
+    const newFlashMode = flashMode === 'off' ? 'on' : 'off';
+    console.log('Setting flash mode to:', newFlashMode);
+    setFlashMode(newFlashMode);
+    console.log('Flash mode after set:', newFlashMode);
   };
 
   /**
@@ -108,7 +113,7 @@ export default function CameraScreen() {
         style={styles.camera}
         facing={facing}
         ref={cameraRef}
-        flash={flashMode}
+        enableTorch={flashMode === 'on'}
       >
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
@@ -124,7 +129,7 @@ export default function CameraScreen() {
               onPress={toggleFlash}
             >
               <MaterialIcons 
-                name={flashMode === "off" ? "flash-off" : "flash-on"} 
+                name="flash-on" 
                 size={24} 
                 color={colors.text.primary} 
               />

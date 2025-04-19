@@ -1,6 +1,6 @@
 # CitrusNotes Mobile
 
-A modern Note Taking application built with Expo (React Native) and Python (FastAPI), with MongoDB integration.
+A modern Note Taking application built with Expo (React Native), Python (FastAPI), and MongoDB integration. The frontend uses Axios for API communication and includes features for document scanning, file management, and secure authentication.
 
 ## Project Structure
 
@@ -8,30 +8,50 @@ A modern Note Taking application built with Expo (React Native) and Python (Fast
 CitrusMobileExpo/
 ├── app/                      # Main application code
 │   ├── navigation/           # Navigation configuration
+│   │   └── AppNavigator.js   # Defines the app's navigation structure and screen flow
 │   ├── screens/              # Screen components
-│   │   ├── LibraryScreen.js  # Main library view
-│   │   ├── CameraScreen.js   # Camera functionality
-│   │   ├── ScanScreen.js     # Document scanning
-│   │   └── WelcomeScreen.js  # Welcome/landing screen
+│   │   ├── CameraScreen.js   # Camera interface for capturing photos and documents
+│   │   ├── FavoriteScreen.js # Interface for viewing and managing favorite items
+│   │   ├── LibraryScreen.js  # Main file management interface, displays files and folders
+│   │   ├── ScanScreen.js     # Document scanning interface with PDF creation
+│   │   ├── SignInScreen.js   # User authentication interface
+│   │   ├── SignUpScreen.js   # User registration interface
+│   │   └── WelcomeScreen.js  # Initial landing page with app introduction
 │   ├── components/           # Reusable UI components
+│   │   ├── BottomNavBar.js   # Bottom navigation bar with Library, Favorites, and Scan options
+│   │   ├── LibraryFAB.js     # Floating action button for creating folders and uploading files
+│   │   ├── LibraryItems.js   # Grid and list view components for displaying files and folders
+│   │   ├── LibraryModals.js  # Modal components for file operations (rename, move, delete)
+│   │   ├── LibraryNavBar.js  # Top navigation bar with back button and view mode toggle
+│   │   └── SearchBar.js      # Search interface for filtering files and folders
 │   ├── constants/            # App constants and theme
+│   │   └── theme.js          # Color schemes, typography, and spacing constants
 │   ├── services/             # API and service modules
-│   │   └── api.js           # API service implementation
+│   │   ├── api.js           # Axios-based API service for backend communication
+│   │   └── auth.js          # Authentication service for user management
 │   ├── store/               # Redux store configuration
 │   └── utils/               # Utility functions
-├── assets/                   # Images, fonts, etc.
-├── App.js                    # Root component
-├── app.json                  # Expo configuration
-└── package.json              # Frontend dependencies
+├── App.js                    # Root component that initializes the app
+├── app.json                  # Expo configuration and app metadata
+├── babel.config.js           # Babel configuration; Might be Redundant
+├── env.d.ts                  # TypeScript environment declarations; Might be Redundant
+└── package.json              # Frontend dependencies and scripts
 
 Backend/
-├── app/                     # Backend application code (FastAPI)
-│   ├── main.py             # Main FastAPI application
-│   ├── models.py           # Pydantic models
-│   ├── database.py         # MongoDB configuration
-│   └── utils/              # Utility modules
-├── tests/                   # Test files
-└── requirements.txt         # Python dependencies
+├── app/                     # Backend application code
+│   ├── main.py             # Main FastAPI application and route definitions
+│   ├── models.py           # Pydantic models for data validation
+│   ├── database.py         # MongoDB connection and configuration
+│   └── utils/              # Utility modules for file processing and other operations
+├── temp/                    # Temporary files for processing
+├── requirements.txt         # Python dependencies
+└── .flake8                  # Flake8 configuration for code linting
+
+Root/
+├── setup.sh                 # Script to set up development environment
+├── run.sh                   # Script to start development servers
+├── package.json             # Root dependencies
+└── .gitignore              # Git ignore rules
 ```
 
 ## Features
@@ -96,19 +116,39 @@ Backend/
    - Configure backend settings
    - Update React and Expo packages
 
-### Backend Configuration
+### Environment Configuration
+
+#### Backend Configuration
 1. Navigate to the `backend` directory
 2. Update the `.env` file with your MongoDB credentials:
+
+   For MongoDB Atlas:
    ```
    MONGODB_URL=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
    ```
+   Replace `<username>`, `<password>`, and `<cluster>` with your MongoDB Atlas credentials.
+
    For local MongoDB:
    ```
    MONGODB_URL=mongodb://localhost:27017/citrusnotes
    ```
-3. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
+
+3. Additional backend environment variables:
+   ```
+   SECRET_KEY=<your-secret-key>  # Used for JWT token generation
+   ALGORITHM=HS256              # JWT algorithm
+   ACCESS_TOKEN_EXPIRE_MINUTES=30 # Token expiration time
+   ```
+
+#### Frontend Configuration
+1. Navigate to the `CitrusMobileExpo` directory
+2. Update the `.env` file with your backend API URL:
+   ```
+   EXPO_API_URL=http://localhost:8000  # For local development on a simulator
+   # or
+   EXPO_API_URL=http://your-ip4:8000 # Also for local development on Expo Go
+   # or
+   EXPO_API_URL=https://your-production-api.com  # For production
    ```
 
 ### Running the Application
@@ -117,6 +157,16 @@ Backend/
    ./run.sh
    ```
    This will start both the frontend and backend servers.
+
+2. For local development:
+   - Backend API will be available at: http://localhost:8000
+   - Expo development server will be available at: http://localhost:19000
+   - Scan the QR code with Expo Go to run the app on your device
+
+3. For production deployment:
+   - Update the `EXPO_API_URL` in the frontend `.env` file to point to your production API
+   - Build the Expo app using `expo build` commands
+   - Deploy the backend to your production server
 
 ## Development
 
@@ -164,7 +214,6 @@ Backend/
 - Use functional components with hooks
 - Follow React Native best practices
 - Implement proper error handling
-
 
 #### JavaScript General Conventions
 - Use ES6+ features and syntax

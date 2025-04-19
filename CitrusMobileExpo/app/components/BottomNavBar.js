@@ -25,40 +25,28 @@ export default function BottomNavBar({ activeScreen }) {
   };
 
   /**
-   * Handles navigation to the Library screen
-   * If already on Library screen, resets to root
+   * Handles Library button press
+   * Sets parent_id to null to return to root directory
    * 
    * @returns {void}
    */
   const handleLibraryPress = () => {
     if (activeScreen === 'Library') {
-      // If already on Library screen, reset to root
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Library' }],
-      });
+      // If on Library screen, refresh the root directory
+      navigation.setParams({ parent_id: null, refresh: true });
     } else {
-      // If on another screen, navigate to Library
-      navigation.navigate('Library');
+      // If on another screen, navigate to Library at root; Redundant but kept for clarity
+      navigation.navigate('Library', { parent_id: null });
     }
   };
 
   /**
    * Handles navigation to the Favorites screen
-   * If already on Favorites screen, refreshes the page
    * 
    * @returns {void}
    */
   const handleFavoritePress = () => {
-    if (activeScreen === 'FavoriteScreen') {
-      // If already on favorites screen, refresh the page
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'FavoriteScreen' }],
-      });
-    } else {
-      navigation.navigate('FavoriteScreen');
-    }
+    navigation.navigate('FavoriteScreen');
   };
 
   return (
