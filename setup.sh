@@ -91,7 +91,7 @@ setup_python_env() {
     
     # Install critical packages first
     echo "Installing critical dependencies..."
-    pip install --only-binary :all: Pillow==10.2.0
+    pip install --only-binary :all: Pillow==10.4.0
     pip install email-validator==2.1.0.post1
     pip install "pydantic[email]"==2.6.1
     
