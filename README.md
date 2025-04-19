@@ -27,22 +27,22 @@ CitrusMobileExpo/
 │   ├── constants/            # App constants and theme
 │   │   └── theme.js          # Color schemes, typography, and spacing constants
 │   ├── services/             # API and service modules
-│   │   ├── api.js           # Axios-based API service for backend communication
-│   │   └── auth.js          # Authentication service for user management
-│   ├── store/               # Redux store configuration
-│   └── utils/               # Utility functions
+│   │   ├── api.js            # Axios-based API service for backend communication
+│   │   └── auth.js           # Authentication service for user management
+│   ├── store/                # Redux store configuration
+│   └── utils/                # Utility functions
 ├── App.js                    # Root component that initializes the app
 ├── app.json                  # Expo configuration and app metadata
-├── babel.config.js           # Babel configuration; Might be Redundant
-├── env.d.ts                  # TypeScript environment declarations; Might be Redundant
+├── babel.config.js           # Babel configuration
+├── env.d.ts                  # TypeScript environment declarations
 └── package.json              # Frontend dependencies and scripts
 
 Backend/
 ├── app/                     # Backend application code
-│   ├── main.py             # Main FastAPI application and route definitions
-│   ├── models.py           # Pydantic models for data validation
-│   ├── database.py         # MongoDB connection and configuration
-│   └── utils/              # Utility modules for file processing and other operations
+│   ├── main.py              # Main FastAPI application and route definitions
+│   ├── models.py            # Pydantic models for data validation
+│   ├── database.py          # MongoDB connection and configuration
+│   └── utils/               # Utility modules for file processing and other operations
 ├── temp/                    # Temporary files for processing
 ├── requirements.txt         # Python dependencies
 └── .flake8                  # Flake8 configuration for code linting
@@ -51,7 +51,7 @@ Root/
 ├── setup.sh                 # Script to set up development environment
 ├── run.sh                   # Script to start development servers
 ├── package.json             # Root dependencies
-└── .gitignore              # Git ignore rules
+└── .gitignore               # Git ignore rules
 ```
 
 ## Features
@@ -76,7 +76,6 @@ Root/
 ### User Interface
 - Modern, clean design
 - Responsive layout
-- Dark mode support
 - Customizable themes
 - Intuitive navigation
 
@@ -183,30 +182,6 @@ Root/
 - Pydantic models for data validation
 - Async/await for efficient operations
 - Comprehensive error handling
-
-## API Documentation
-
-### Authentication
-- POST `/users/` - Create new user
-- GET `/users/` - List all users
-- GET `/users/{user_id}` - Get specific user
-
-### File System
-- POST `/file-system/` - Create file system item
-- GET `/file-system/` - List file system items
-- PUT `/file-system/{item_id}` - Update file system item
-- DELETE `/file-system/{item_id}` - Delete file system item
-
-### File Operations
-- POST `/files/upload/` - Upload file
-- GET `/files/{file_id}` - Download file
-- GET `/files/` - List files
-
-### Document Management
-- POST `/documents/` - Create document
-- GET `/documents/{document_id}` - Get document
-- GET `/documents/` - List documents
-- GET `/images/{file_id}` - Get image
 
 ## Coding Standards
 
