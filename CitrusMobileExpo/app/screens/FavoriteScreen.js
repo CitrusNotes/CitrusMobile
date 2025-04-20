@@ -6,9 +6,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { api } from '../services/api';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-
-// Temporary user ID - TODO: Replace with actual user authentication
-const TEMP_USER_ID = '67f7454e9f6072baae1702c1';
+import { auth } from '../services/auth';
 
 /**
  * Recursive component for rendering folder and file items in a tree structure
@@ -253,6 +251,21 @@ export default function FolderListView() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const searchInputRef = useRef(null);
+  const [userId, setUserId] = useState(null);
+
+  useEffect(() => {
+    const loadUserId = async () => {
+      const id = await auth.getCurrentUserId();
+      setUserId(id);
+    };
+    loadUserId();
+  }, []);
+
+  useEffect(() => {
+    if (userId) {
+      fetchItems();
+    }
+  }, [userId]);
 
   const handleBack = () => {
     navigation.goBack();
@@ -261,20 +274,14 @@ export default function FolderListView() {
   /**
    * Fetches favorite items from the API on component mount
    */
-  useEffect(() => {
-    fetchItems();
-  }, []);
-
-  /**
-   * Fetches all favorite items and their contents
-   * Handles both directly favorited items and items within favorited folders
-   */
   const fetchItems = async () => {
+    if (!userId) return;
+    
     try {
       setLoading(true);
       
       // First, fetch root items
-      const rootData = await api.getFileSystemItems(TEMP_USER_ID);
+      const rootData = await api.getFileSystemItems(userId);
       console.log('Root items:', rootData.map(item => ({ name: item.name, id: item._id })));
       
       // Ensure all items have is_starred property
@@ -297,7 +304,7 @@ export default function FolderListView() {
        * @returns {Promise<Array>} Array of folder contents
        */
       const fetchFolderContents = async (folderId) => {
-        const contents = await api.getFileSystemItems(TEMP_USER_ID, folderId);
+        const contents = await api.getFileSystemItems(userId, folderId);
         const normalizedContents = contents.map(item => ({
           ...item,
           is_starred: item.is_starred || false
