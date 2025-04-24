@@ -23,16 +23,6 @@ from unittest.mock import MagicMock, patch
 import cv2
 import numpy as np
 
-"""
-This file is used to test the imageScan module.
-It is a unit test that tests all the functions in the imageScan module.
-This file also uses mock objects to test the imageScan module without
-actually connecting to the database.
-might have to move the last 2 imports below the backend_dir variable
-declaration and sys.path.insert(0, backend_dir) to avoid import errors.
-(Linter doesn't like it)
-"""
-
 # Add the backend directory to the Python path
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, backend_dir)
