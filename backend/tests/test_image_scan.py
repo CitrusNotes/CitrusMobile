@@ -38,15 +38,18 @@ backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, backend_dir)
 
 # pylint: disable=wrong-import-position
-# noqa: E402
 from app.database import fs  # noqa: E402
 from app.utils.image_scan import apply_canny_edge_detection  # noqa: E402
-from app.utils.image_scan import (apply_gaussian_blur, biggest_contour,
-                                  contour_coordinate_reordering,
-                                  convert_to_gray, get_m_matrix, image_closing,
-                                  load_image_from_data,
-                                  process_images_into_pdf, scan_document,
-                                  warp_perspective) # noqa: E402
+from app.utils.image_scan import apply_gaussian_blur  # noqa: E402
+from app.utils.image_scan import biggest_contour  # noqa: E402
+from app.utils.image_scan import contour_coordinate_reordering  # noqa: E402
+from app.utils.image_scan import convert_to_gray  # noqa: E402
+from app.utils.image_scan import get_m_matrix  # noqa: E402
+from app.utils.image_scan import image_closing  # noqa: E402
+from app.utils.image_scan import load_image_from_data  # noqa: E402
+from app.utils.image_scan import process_images_into_pdf  # noqa: E402
+from app.utils.image_scan import scan_document  # noqa: E402
+from app.utils.image_scan import warp_perspective  # noqa: E402
 
 
 class TestImageScan(unittest.TestCase):
