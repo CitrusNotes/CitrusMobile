@@ -185,7 +185,78 @@ Root/
 
 ## Coding Standards
 
-### Frontend (JavaScript/React Native)
+### Python Backend Standards
+
+#### Tooling
+- **Black** (v24.1.1): Code formatter that enforces consistent formatting
+  - Line length: 88 characters
+  - Double quotes for strings
+  - Trailing commas in multi-line structures
+- **Flake8** (v7.0.0): Style guide enforcement
+  - Max line length: 88 characters
+  - Ignored rules: E203, W503, E501
+  - Special rules for test files and docstrings
+- **Pylint** (v3.0.3): Static code analysis
+  - Score threshold: 10
+  - Custom plugins: pylint-django, pylint-pytest
+  - Comprehensive type checking and code quality analysis
+
+#### Naming Conventions
+- Classes: `PascalCase`
+- Functions and variables: `snake_case`
+- Constants: `UPPER_SNAKE_CASE`
+- Private members: `_leading_underscore`
+- Protected members: `__double_leading_underscore`
+
+#### Code Organization
+- Imports should be grouped in this order:
+  1. Standard library imports
+  2. Third-party imports
+  3. Local application imports
+- Each group should be separated by a blank line
+- Within each group, imports should be alphabetically sorted
+
+#### Documentation
+- Use Google-style docstrings for all public modules, classes, and functions
+- Include type hints for all function parameters and return values
+- Document exceptions that may be raised
+- Include examples in docstrings where appropriate
+
+Example:
+```python
+def process_image(image: np.ndarray, threshold: float = 0.5) -> np.ndarray:
+    """Process an image with the given threshold value.
+
+    Args:
+        image (np.ndarray): Input image to process
+        threshold (float, optional): Threshold value for processing. Defaults to 0.5.
+
+    Returns:
+        np.ndarray: Processed image
+
+    Raises:
+        ValueError: If image is not a valid numpy array
+        TypeError: If threshold is not a float
+
+    Example:
+        >>> img = np.zeros((100, 100))
+        >>> processed = process_image(img, 0.7)
+    """
+```
+
+#### Error Handling
+- Use specific exceptions rather than generic ones
+- Include meaningful error messages
+- Use context managers for resource management
+- Log errors appropriately
+
+#### Testing
+- Write unit tests for all public functions
+- Use pytest for testing framework
+- Follow AAA pattern (Arrange, Act, Assert)
+- Include both positive and negative test cases
+
+### JavaScript/React Native Frontend Standards
 - Use functional components with hooks
 - Follow React Native best practices
 - Implement proper error handling
@@ -201,18 +272,6 @@ Root/
 - Use async/await for asynchronous operations
 - Use proper error handling with try/catch
 - Use JSDoc comments for documentation
-
-### Backend (Python)
-- Follow PEP 8 style guide: [PEP 8](https://github.com/python/peps/blob/main/pep-0008.txt)
-- Implement proper error handling
-- Use async/await for asynchronous operations
-- Write comprehensive tests
-- Use proper docstrings (Google style)
-- Use type hints for better code clarity
-- Use virtual environments for dependency management
-- Use proper import ordering
-- Use proper exception handling
-- Use context managers for resource management
 
 ## License
 
