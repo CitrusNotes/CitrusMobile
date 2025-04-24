@@ -17,6 +17,32 @@ kill_process() {
     pkill -f "$1"
 }
 
+# Function to run tests
+run_tests() {
+    echo -e "${BLUE}Running automated tests...${NC}"
+    
+    # Change to backend directory
+    cd backend || {
+        echo -e "${RED}Failed to change to backend directory${NC}"
+        return 1
+    }
+    
+    # Activate virtual environment
+    source venv/bin/activate || {
+        echo -e "${RED}Failed to activate virtual environment${NC}"
+        return 1
+    }
+    
+    # Run test script
+    if ./test.sh; then
+        echo -e "${GREEN}All tests passed successfully!${NC}"
+        return 0
+    else
+        echo -e "${RED}Tests failed. Please fix the issues before proceeding.${NC}"
+        return 1
+    fi
+}
+
 # Function to check and kill existing development processes
 kill_existing_processes() {
     echo -e "${BLUE}Checking for existing processes...${NC}"
@@ -103,6 +129,12 @@ kill_existing_processes
 
 # Verify MongoDB connection before proceeding
 verify_mongodb_connection
+
+# Run tests before starting servers
+if ! run_tests; then
+    echo -e "${RED}Tests failed. Aborting startup.${NC}"
+    exit 1
+fi
 
 # Start backend server in a new terminal window
 echo -e "${BLUE}Starting backend server in a new terminal...${NC}"
