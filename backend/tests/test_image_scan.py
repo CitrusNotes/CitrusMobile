@@ -1,3 +1,18 @@
+"""Test suite for the image scanning functionality.
+
+This module contains unit tests for the image scanning and
+processing functionality in the CitrusNotes application.
+It tests various image processing operations including:
+- Image loading and conversion
+- Edge detection and contour processing
+- Document scanning and perspective correction
+- PDF generation from multiple images
+
+The tests use mock objects to simulate database operations and
+ensure that the image processing pipeline works correctly without
+requiring actual database access.
+"""
+
 import asyncio
 import base64
 import os
@@ -7,13 +22,6 @@ from unittest.mock import MagicMock, patch
 
 import cv2
 import numpy as np
-from app.database import fs
-from app.utils.imageScan import (ApplyCannyEdgeDetection, ApplyGaussianBlur,
-                                 BiggestContour, ConvertToGray, GetMMatrix,
-                                 ImageClosing, ProcessImagesIntoPDF,
-                                 ScanDocument, WarpPerspective,
-                                 contourCoordinateReordering,
-                                 load_image_from_data)
 
 """
 This file is used to test the imageScan module.
@@ -29,44 +37,68 @@ declaration and sys.path.insert(0, backend_dir) to avoid import errors.
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, backend_dir)
 
+# pylint: disable=wrong-import-position
+# noqa: E402
+from app.database import fs  # noqa: E402
+from app.utils.image_scan import apply_canny_edge_detection  # noqa: E402
+from app.utils.image_scan import (apply_gaussian_blur, biggest_contour,
+                                  contour_coordinate_reordering,
+                                  convert_to_gray, get_m_matrix, image_closing,
+                                  load_image_from_data,
+                                  process_images_into_pdf, scan_document,
+                                  warp_perspective) # noqa: E402
+
 
 class TestImageScan(unittest.TestCase):
+    """Test suite for image scanning functionality.
+
+    This test suite verifies the functionality of the image scanning module,
+    including image processing, document scanning, and PDF generation.
+    Tests cover both individual image processing functions and the complete
+    document scanning pipeline.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize test attributes."""
+        super().__init__(*args, **kwargs)
+        self.last_uploaded_data = b""
+
     @classmethod
     def setUpClass(cls):
         """Set up test fixtures that will be used by all test methods"""
         # Create a test image (white square on black background)
-        cls.sampleImage = np.zeros((100, 100, 3), dtype=np.uint8)
-        cls.sampleImage[25:75, 25:75] = 255
+        cls.sample_image = np.zeros((100, 100, 3), dtype=np.uint8)
+        cls.sample_image[25:75, 25:75] = 255
 
         # Convert np array to bytes
-        _, imgBytes = cv2.imencode(".jpg", cls.sampleImage)
-        cls.sampleImageBytes = imgBytes.tobytes()
+        _, img_bytes = cv2.imencode(".jpg", cls.sample_image)
+        cls.sample_image_bytes = img_bytes.tobytes()
 
         # Create a test user ID
-        cls.testUser = "67f7454e9f6072baae1702c1"
+        cls.t_user = "67f7454e9f6072baae1702c1"
 
         # Load test images from data folder in the format of
         # base64 encoded strings.
         # (like the ones in the database and api calls)
-        cls.testImages = []
-        testDataDir = os.path.join(os.path.dirname(__file__), "data")
-        print(f"Looking for images in: {testDataDir}")
-        for imgFile in os.listdir(testDataDir):
-            if imgFile.lower().endswith((".jpg", ".jpeg", ".png")):
-                imgPath = os.path.join(testDataDir, imgFile)
-                print(f"Found image: {imgFile}")
-                with open(imgPath, "rb") as f:
-                    imgData = f.read()
-                    base64Img = base64.b64encode(imgData).decode("utf-8")
-                    cls.testImages.append(base64Img)
+        cls.test_images = []
+        test_data_dir = os.path.join(os.path.dirname(__file__), "data")
+        print(f"Looking for images in: {test_data_dir}")
+        for img_file in os.listdir(test_data_dir):
+            if img_file.lower().endswith((".jpg", ".jpeg", ".png")):
+                img_path = os.path.join(test_data_dir, img_file)
+                print(f"Found image: {img_file}")
+                with open(img_path, "rb") as f:
+                    img_data = f.read()
+                    base64_img = base64.b64encode(img_data).decode("utf-8")
+                    cls.test_images.append(base64_img)
 
         # Debug print the loaded images
-        print(f"Loaded {len(cls.testImages)} test images")
+        print(f"Loaded {len(cls.test_images)} test images")
 
         # Create testResults directory if it doesn't exist
-        trd = os.path.join(os.path.dirname(__file__), "testResults")
-        cls.test_results_dir = trd
-        os.makedirs(trd, exist_ok=True)
+        results_dir = os.path.join(os.path.dirname(__file__), "testResults")
+        cls.test_results_dir = results_dir
+        os.makedirs(results_dir, exist_ok=True)
 
     @classmethod
     def tearDownClass(cls):
@@ -81,25 +113,25 @@ class TestImageScan(unittest.TestCase):
         """Set up mock operations for GridFS operations"""
 
         # Simulate the upload of a file to GridFS
-        async def mockUploadCoroutine(*args, **kwargs):
+        async def mock_upload_coroutine(filename, source, metadata=None):
             # Store the uploaded data for later use
-            self.last_uploaded_data = kwargs.get("source", b"")
+            self.last_uploaded_data = source
             return "mock_gridfs_id"
 
-        self.mock_upload = MagicMock(side_effect=mockUploadCoroutine)
+        self.mock_upload = MagicMock(side_effect=mock_upload_coroutine)
 
         # Simulate the download of a file from GridFS
-        async def mockDownloadCoroutine(*args, **kwargs):
+        async def mock_download_coroutine(file_id):
             # Return the last uploaded data
             return self.last_uploaded_data
 
-        self.mock_download = MagicMock(side_effect=mockDownloadCoroutine)
+        self.mock_download = MagicMock(side_effect=mock_download_coroutine)
 
         # Simulate the insertion of a file into the file system collection
-        async def mockInsertCoroutine(*args, **kwargs):
+        async def mock_insert_coroutine(_document):
             return MagicMock(inserted_id="mock_file_id")
 
-        self.mock_insert = MagicMock(side_effect=mockInsertCoroutine)
+        self.mock_insert = MagicMock(side_effect=mock_insert_coroutine)
 
         # Patch the GridFS operations
         command1 = "app.database.fs.upload_from_stream"
@@ -122,38 +154,38 @@ class TestImageScan(unittest.TestCase):
     def test_load_image_from_data(self):
         """Test loading an image from bytes data"""
         # Load the image from the bytes data
-        result = load_image_from_data(self.sampleImageBytes)
+        result = load_image_from_data(self.sample_image_bytes)
         # Check if the result is a numpy array
         self.assertIsInstance(result, np.ndarray)
         self.assertEqual(result.shape[2], 3)  # Should be a color image
 
-    def test_ConvertToGray(self):
+    def test_convert_to_gray(self):
         """Test grayscale conversion"""
-        gray = ConvertToGray(self.sampleImage)
+        gray = convert_to_gray(self.sample_image)
         self.assertIsInstance(gray, np.ndarray)
         self.assertEqual(len(gray.shape), 2)  # Should be grayscale (2D)
         self.assertEqual(gray.dtype, np.uint8)
 
-    def test_ApplyGaussianBlur(self):
+    def test_apply_gaussian_blur(self):
         """Test Gaussian blur application"""
-        blurred = ApplyGaussianBlur(self.sampleImage)
+        blurred = apply_gaussian_blur(self.sample_image)
         self.assertIsInstance(blurred, np.ndarray)
-        self.assertEqual(blurred.shape, self.sampleImage.shape)
+        self.assertEqual(blurred.shape, self.sample_image.shape)
 
-    def test_ApplyCannyEdgeDetection(self):
+    def test_apply_canny_edge_detection(self):
         """Test Canny edge detection"""
-        edges = ApplyCannyEdgeDetection(self.sampleImage, 100, 200)
+        edges = apply_canny_edge_detection(self.sample_image, 100, 200)
         self.assertIsInstance(edges, np.ndarray)
         self.assertEqual(len(edges.shape), 2)  # Should be grayscale (2D)
         self.assertEqual(edges.dtype, np.uint8)
 
-    def test_ImageClosing(self):
+    def test_image_closing(self):
         """Test morphological closing operation"""
-        closed = ImageClosing(self.sampleImage)
+        closed = image_closing(self.sample_image)
         self.assertIsInstance(closed, np.ndarray)
-        self.assertEqual(closed.shape, self.sampleImage.shape)
+        self.assertEqual(closed.shape, self.sample_image.shape)
 
-    def test_contourCoordinateReordering(self):
+    def test_contour_coordinate_reordering(self):
         """Test contour point reordering"""
         # Create a test rectangle (contour)
         # bottom-right, top-left, top-right, bottom-left
@@ -161,7 +193,7 @@ class TestImageScan(unittest.TestCase):
         points = points.reshape(4, 1, 2)
 
         # Reorder the points
-        points = contourCoordinateReordering(points)
+        points = contour_coordinate_reordering(points)
         self.assertIsInstance(points, np.ndarray)
         self.assertEqual(points.shape, (4, 1, 2))
 
@@ -171,58 +203,58 @@ class TestImageScan(unittest.TestCase):
         expected = expected.reshape(4, 1, 2)
         np.testing.assert_array_equal(points, expected)
 
-    def test_BiggestContour(self):
+    def test_biggest_contour(self):
         """Test finding the biggest contour"""
         # Convert to grayscale and find edges
-        gray = ConvertToGray(self.sampleImage)
-        edges = ApplyCannyEdgeDetection(gray, 100, 200)
-        closed = ImageClosing(edges)
+        gray = convert_to_gray(self.sample_image)
+        edges = apply_canny_edge_detection(gray, 100, 200)
+        closed = image_closing(edges)
 
-        contour = BiggestContour(closed)
+        contour = biggest_contour(closed)
         self.assertIsInstance(contour, np.ndarray)
 
-    def test_GetMMatrix(self):
+    def test_get_m_matrix(self):
         """Test perspective transform matrix calculation"""
         source = np.float32([[0, 0], [100, 0], [100, 100], [0, 100]])
         destination = np.float32([[0, 0], [200, 0], [200, 200], [0, 200]])
 
-        matrix = GetMMatrix(source, destination)
+        matrix = get_m_matrix(source, destination)
         self.assertIsInstance(matrix, np.ndarray)
         self.assertEqual(matrix.shape, (3, 3))
 
-    def test_WarpPerspective(self):
+    def test_warp_perspective(self):
         """Test perspective warping"""
         # Create a simple transform matrix
         source = np.float32([[0, 0], [100, 0], [100, 100], [0, 100]])
         destination = np.float32([[0, 0], [200, 0], [200, 200], [0, 200]])
-        matrix = GetMMatrix(source, destination)
+        matrix = get_m_matrix(source, destination)
 
-        warped = WarpPerspective(self.sampleImage, matrix, 200, 200)
+        warped = warp_perspective(self.sample_image, matrix, 200, 200)
         self.assertIsInstance(warped, np.ndarray)
         self.assertEqual(warped.shape[:2], (200, 200))  # Check dimensions
 
-    def test_ScanDocument(self):
+    def test_scan_document(self):
         """Test document scanning with different options"""
         # Test with colored
-        result0 = ScanDocument(self.sampleImage, option=0)
+        result0 = scan_document(self.sample_image, option=0)
         self.assertIsInstance(result0, np.ndarray)
 
         # Test with grayscale
-        result1 = ScanDocument(self.sampleImage, option=1)
+        result1 = scan_document(self.sample_image, option=1)
         self.assertIsInstance(result1, np.ndarray)
         self.assertEqual(len(result1.shape), 2)  # Should be grayscale
 
         # Test with binary
-        result2 = ScanDocument(self.sampleImage, option=2)
+        result2 = scan_document(self.sample_image, option=2)
         self.assertIsInstance(result2, np.ndarray)
         self.assertEqual(len(result2.shape), 2)  # Should be grayscale
         self.assertTrue(
             np.all(np.logical_or(result2 == 0, result2 == 255))
         )  # Should be binary
 
-    def test_ProcessImagesIntoPDF_single_image(self):
+    def test_process_images_into_pdf_single_image(self):
         """Test PDF creation with a single image"""
-        if not self.testImages:
+        if not self.test_images:
             self.skipTest("No test images found in data directory")
 
         # Create a new event loop for this test
@@ -232,33 +264,34 @@ class TestImageScan(unittest.TestCase):
         try:
             # Process single image
             result = loop.run_until_complete(
-                ProcessImagesIntoPDF(
-                    [self.testImages[0]], "testSingle.pdf", self.testUser
+                process_images_into_pdf(
+                    image_list=[self.test_images[0]],
+                    output_filename="testSingle.pdf",
+                    user_id=self.t_user,
                 )
             )
             self.assertIsInstance(result, str)
             self.assertTrue(len(result) > 0)  # Should return a valid ID
 
             # Save pdf to testResults directory
-            pdfName = "test_ProcessImagesIntoPDF_single_image.pdf"
-            outputPath = os.path.join(self.test_results_dir, pdfName)
+            pdf_name = "test_process_images_into_pdf_single_image.pdf"
+            output_path = os.path.join(self.test_results_dir, pdf_name)
             # Download the pdf using the same loop
-            pdfData = loop.run_until_complete(fs.download_to_stream(result))
-            with open(outputPath, "wb") as f:
-                f.write(pdfData)
+            pdf_data = loop.run_until_complete(fs.download_to_stream(result))
+            with open(output_path, "wb") as f:
+                f.write(pdf_data)
         except Exception as e:
             print(f"Error in single image test: {str(e)}")
             raise
-
         finally:
-            # close the loop
+            # Properly close the event loop
             loop.stop()
             loop.close()
             asyncio.set_event_loop(None)
 
-    def test_ProcessImagesIntoPDF_multiple_images(self):
+    def test_process_images_into_pdf_multiple_images(self):
         """Test PDF creation with multiple images"""
-        if not self.testImages:
+        if not self.test_images:
             self.skipTest("No test images found in data directory")
 
         # Create a new event loop for this test
@@ -267,32 +300,33 @@ class TestImageScan(unittest.TestCase):
 
         try:
             # Process all available images
-            # linter doesn't like full name
-            p = "test_multiple.pdf"
             result = loop.run_until_complete(
-                ProcessImagesIntoPDF(self.testImages, p, self.testUser)
+                process_images_into_pdf(
+                    image_list=self.test_images,
+                    output_filename="test_multiple.pdf",
+                    user_id=self.t_user,
+                )
             )
             self.assertIsInstance(result, str)
             self.assertTrue(len(result) > 0)  # Should return a valid ID
 
             # Save pdf to testResults directory
-            pdfName = "test_ProcessImagesIntoPDF_multiple_images.pdf"
-            outputPath = os.path.join(self.test_results_dir, pdfName)
+            pdf_name = "test_process_images_into_pdf_multiple_images.pdf"
+            output_path = os.path.join(self.test_results_dir, pdf_name)
             # Download the pdf using the same loop
-            pdfData = loop.run_until_complete(fs.download_to_stream(result))
-            with open(outputPath, "wb") as f:
-                f.write(pdfData)
+            pdf_data = loop.run_until_complete(fs.download_to_stream(result))
+            with open(output_path, "wb") as f:
+                f.write(pdf_data)
         except Exception as e:
             print(f"Error in multiple images test: {str(e)}")
             raise
-
         finally:
-            # close the loop
+            # Properly close the event loop
             loop.stop()
             loop.close()
             asyncio.set_event_loop(None)
 
-    def test_ProcessImagesIntoPDF_invalid_input(self):
+    def test_process_images_into_pdf_invalid_input(self):
         """Test PDF creation with invalid input"""
         # Create a new event loop for this test
         loop = asyncio.new_event_loop()
@@ -301,20 +335,19 @@ class TestImageScan(unittest.TestCase):
         try:
             # Test with empty image list
             with self.assertRaises(ValueError):
-                pdfName = "test_empty.pdf"
+                pdf_name = "test_empty.pdf"
                 loop.run_until_complete(
-                    ProcessImagesIntoPDF([], pdfName, self.testUser)
+                    process_images_into_pdf([], pdf_name, self.t_user)
                 )
 
             # Test with invalid base64 string
             with self.assertRaises(ValueError):
-                # linter doesn't like full name
                 p = "test_invalid.pdf"
                 loop.run_until_complete(
-                    ProcessImagesIntoPDF(["invalid_base64"], p, self.testUser)
+                    process_images_into_pdf(["invalid_base64"], p, self.t_user)
                 )
         finally:
-            # close the loop
+            # Properly close the event loop
             loop.stop()
             loop.close()
             asyncio.set_event_loop(None)

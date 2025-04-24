@@ -28,6 +28,17 @@ class PyObjectId(str):
 
     @classmethod
     def validate(cls, v):
+        """Validate and convert a value to a valid ObjectId string.
+
+        Args:
+            v: The value to validate and convert.
+
+        Returns:
+            str: The validated ObjectId string.
+
+        Raises:
+            ValueError: If the value is not a valid ObjectId.
+        """
         if not ObjectId.is_valid(v):
             raise ValueError("Invalid ObjectId")
         return str(v)
@@ -39,6 +50,9 @@ class PyObjectId(str):
 
 class UserBase(BaseModel):
     """Base model for user data.
+
+    This class serves as the foundation for user-related models,
+    containing common fields shared across different user models.
 
     Attributes:
         email (EmailStr): User's email address
@@ -54,12 +68,13 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    """Model for user creation.
+    """User creation model.
 
-    Extends UserBase to include password for new user registration.
+    This class extends UserBase to include password for user registration.
+    It is used when creating a new user account in the system.
 
     Attributes:
-        password (str): User's password (will be hashed before storage)
+        password (str): The user's password for authentication.
     """
 
     password: str
@@ -68,7 +83,8 @@ class UserCreate(UserBase):
 class User(UserBase):
     """Complete user model with database fields.
 
-    Extends UserBase to include database-specific fields.
+    This model represents a user in the database, extending UserBase
+    to include database-specific fields like creation timestamps.
 
     Attributes:
         id (PyObjectId): MongoDB document ID
@@ -89,6 +105,9 @@ class User(UserBase):
 class NoteBase(BaseModel):
     """Base model for note data.
 
+    This class serves as the foundation for note-related models,
+    containing common fields shared across different note models.
+
     Attributes:
         title (str): Note title
         content (str): Note content
@@ -100,19 +119,11 @@ class NoteBase(BaseModel):
     tags: List[str] = []
 
 
-class NoteCreate(NoteBase):
-    """Model for note creation.
-
-    Currently identical to NoteBase, but separated for future extensibility.
-    """
-
-    pass
-
-
 class Note(NoteBase):
     """Complete note model with database fields.
 
-    Extends NoteBase to include database-specific fields.
+    This model represents a note in the database, extending NoteBase
+    to include database-specific fields like user ownership and timestamps.
 
     Attributes:
         id (PyObjectId): MongoDB document ID
@@ -135,6 +146,9 @@ class Note(NoteBase):
 class FileBase(BaseModel):
     """Base model for file data.
 
+    This class serves as the foundation for file-related models,
+    containing common fields shared across different file models.
+
     Attributes:
         filename (str): Name of the file
         content_type (str): MIME type of the file
@@ -146,19 +160,11 @@ class FileBase(BaseModel):
     size: int
 
 
-class FileCreate(FileBase):
-    """Model for file creation.
-
-    Currently identical to FileBase, but separated for future extensibility.
-    """
-
-    pass
-
-
 class File(FileBase):
     """Complete file model with database fields.
 
-    Extends FileBase to include database-specific fields.
+    This model represents a file in the database, extending FileBase
+    to include database-specific fields like user ownership and timestamps.
 
     Attributes:
         id (PyObjectId): MongoDB document ID
@@ -181,16 +187,17 @@ class File(FileBase):
 
 
 class ScannedDocument(BaseModel):
-    """Model for scanned documents.
+    """Scanned document model.
 
-    Represents a document created from scanned images.
+    This class represents a document that has been scanned and processed.
+    It contains metadata about the document and its PDF representation.
 
     Attributes:
-        id (Optional[PyObjectId]): MongoDB document ID
-        title (str): Document title
-        pdf_url (Optional[str]): URL to the generated PDF
-        created_at (datetime): Document creation timestamp
-        updated_at (datetime): Last update timestamp
+        id (Optional[PyObjectId]): The MongoDB document ID.
+        title (str): The title of the scanned document.
+        pdf_url (Optional[str]): The URL to the generated PDF file.
+        created_at (datetime): The timestamp when the document was created.
+        updated_at (datetime): The timestamp when the document was updated.
     """
 
     id: Optional[PyObjectId] = Field(alias="_id")
@@ -206,16 +213,17 @@ class ScannedDocument(BaseModel):
 
 
 class ScannedImage(BaseModel):
-    """Model for scanned images.
+    """Scanned image model.
 
-    Represents an individual image within a scanned document.
+    This class represents an individual image within a scanned document.
+    It contains metadata about the image and its position in the document.
 
     Attributes:
-        id (Optional[PyObjectId]): MongoDB document ID
-        document_id (PyObjectId): ID of the parent document
-        image_url (str): URL to the image file
-        order_index (int): Position of the image in the document
-        created_at (datetime): Image creation timestamp
+        id (Optional[PyObjectId]): The MongoDB document ID.
+        document_id (PyObjectId): The ID of the parent document.
+        image_url (str): The URL to the image file.
+        order_index (int): The position of the image in the document.
+        created_at (datetime): The timestamp when the image was created.
     """
 
     id: Optional[PyObjectId] = Field(alias="_id")
@@ -231,23 +239,24 @@ class ScannedImage(BaseModel):
 
 
 class FileSystemItem(BaseModel):
-    """Model for file system items (files and folders).
+    """File system item model.
 
-    Represents both files and folders in the user's file system.
+    This class represents both files and folders in the user's file system.
+    It contains metadata about the item's location, type, and ownership.
 
     Attributes:
-        id (PyObjectId): MongoDB document ID
-        name (str): Name of the item
-        path (str): Full path of the item
-        size (float): Size of the item in bytes (0 for folders)
-        created_at (datetime): Item creation timestamp
-        modified_at (datetime): Last modification timestamp
-        is_starred (bool): Whether the item is starred
-        tags (List[str]): List of tags associated with the item
-        user_id (PyObjectId): ID of the user who owns the item
-        parent_id (Optional[PyObjectId]): ID of the parent folder
-        is_folder (bool): Whether the item is a folder
-        content_type (Optional[str]): MIME type of the file (None for folders)
+        id (PyObjectId): The MongoDB document ID.
+        name (str): The name of the item.
+        path (str): The full path of the item.
+        size (float): The size of the item in bytes (0 for folders).
+        created_at (datetime): The timestamp when the item was created.
+        modified_at (datetime): The timestamp when the item was last modified.
+        is_starred (bool): Whether the item is starred.
+        tags (List[str]): List of tags associated with the item.
+        user_id (PyObjectId): The ID of the user who owns the item.
+        parent_id (Optional[PyObjectId]): The ID of the parent folder.
+        is_folder (bool): Whether the item is a folder.
+        content_type (Optional[str]): The MIME type of file (Folders: None).
     """
 
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
@@ -272,7 +281,8 @@ class FileSystemItem(BaseModel):
 class Token(BaseModel):
     """Model for authentication tokens.
 
-    Represents a JWT token used for authentication.
+    This model represents a JWT token used for user authentication,
+    containing the token string and its type.
 
     Attributes:
         access_token (str): The JWT token
@@ -286,7 +296,8 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     """Model for token payload data.
 
-    Represents the data stored within a JWT token.
+    This model represents the data stored within a JWT token,
+    containing the authenticated user's email.
 
     Attributes:
         email (Optional[str]): Email address of the authenticated user

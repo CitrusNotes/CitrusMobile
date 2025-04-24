@@ -21,7 +21,7 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 
 from .database import create_indexes, db, file_system, fs, users
-from .utils.imageScan import ProcessImagesIntoPDF
+from .utils.image_scan import process_images_into_pdf
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -52,7 +52,15 @@ app.add_middleware(
 
 # Function to ensure test user exists
 async def ensure_test_user():
-    """Ensure the test user exists in the database."""
+    """Ensure the test user exists in the database.
+
+    This function checks/creates a user in the database for testing purposes.
+    The test user has a predefined ID and credentials for testing purposes.
+
+    Raises:
+        ValueError: If there's an error creating the test user
+        Exception: For any other unexpected errors
+    """
     test_user_id = "67f7454e9f6072baae1702c1"
     try:
         print("\nDebug: Checking for test user with ID: " + test_user_id)
@@ -70,8 +78,13 @@ async def ensure_test_user():
             print("Debug: Test user created successfully")
         else:
             print("Debug: Test user already exists")
+    except ValueError as e:
+        print("Debug: Error creating test user: " + str(e))
+        raise ValueError(f"Error creating test user: {str(e)}") from e
     except Exception as e:
-        print("Debug: Error ensuring test user exists: " + str(e))
+        print("Debug: Unexpected error ensuring test user exists: " + str(e))
+        error_message = f"Unexpected error ensuring test user exists: {str(e)}"
+        raise Exception(error_message) from e
 
 
 # Create test user on startup
@@ -142,10 +155,10 @@ async def create_user(email: str = Form(...), password: str = Form(...)):
     except HTTPException as he:
         raise he
     except Exception as e:
-        print(f"Error creating user: {str(e)}")
+        logger.error("Error creating user: %s", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to create user. Please try again."
-        )
+        ) from e
 
 
 @app.get("/users/")
@@ -183,8 +196,9 @@ async def get_user(user_id: str):
         # Convert ObjectId to string
         user["_id"] = str(user["_id"])
         return user
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    except ValueError as exc:
+        error_message = "Invalid user ID format"
+        raise HTTPException(status_code=400, detail=error_message) from exc
 
 
 @app.post("/users/login")
@@ -226,7 +240,7 @@ async def login_user(email: str = Form(...), password: str = Form(...)):
         raise HTTPException(
             status_code=500,
             detail="An unexpected error occurred. Please try again later.",
-        )
+        ) from e
 
 
 # Document management endpoints
@@ -281,7 +295,7 @@ async def create_document(
             "document_id": str(document_id),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/documents/{document_id}")
@@ -352,8 +366,8 @@ async def get_image(file_id: str):
             media_type=file.content_type,
             filename=file.filename,
         )
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Image not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Image not found") from exc
 
 
 # FileSystem endpoints
@@ -381,7 +395,7 @@ async def create_filesystem_item(
         await file_system.insert_one(item)
         return {"message": "Creation Success", "item_id": str(item["_id"])}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/file-system/")
@@ -473,8 +487,9 @@ async def get_filesystem_item(item_id: str):
             item["parent_id"] = str(item["parent_id"])
         item["user_id"] = str(item["user_id"])
         return item
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid item ID format")
+    except ValueError as exc:
+        error_message = "Invalid item ID format"
+        raise HTTPException(status_code=400, detail=error_message) from exc
 
 
 @app.put("/file-system/{item_id}")
@@ -496,10 +511,10 @@ async def update_filesystem_item(
             else:
                 try:
                     update_data["parent_id"] = ObjectId(parent_id)
-                except ValueError:
+                except ValueError as exc:
                     raise HTTPException(
                         status_code=400, detail="Invalid parent_id format"
-                    )
+                    ) from exc
         if tags is not None:
             update_data["tags"] = tags
         if is_starred is not None:
@@ -513,7 +528,7 @@ async def update_filesystem_item(
             raise HTTPException(status_code=404, detail="Item not found")
         return {"message": "Update successful"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.delete("/file-system/{item_id}")
@@ -538,7 +553,7 @@ async def delete_filesystem_item(item_id: str):
             try:
                 await fs.delete(ObjectId(item["gridfs_id"]))
             except Exception as e:
-                print("Error deleting from GridFS: " + str(e))
+                print(f"Error deleting from GridFS: {str(e)}")
                 # Continue even if GridFS deletion fails
 
         # Delete from file system
@@ -548,7 +563,7 @@ async def delete_filesystem_item(item_id: str):
 
         return {"message": "Item deleted successfully"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 # File upload endpoint
@@ -584,21 +599,22 @@ async def upload_file_to_filesystem(
         await file_system.insert_one(item)
         return {"message": "Upload Success", "item_id": str(item["_id"])}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/file-system/download/{file_id}")
 async def download_file_from_filesystem(file_id: str):
     """Download a file by its ID."""
     try:
-        logger.debug(f"Downloading file with ID: {file_id}")
+        logger.debug("Downloading file with ID: %s", file_id)
 
         # Get file from GridFS
         try:
             grid_out = await fs.open_download_stream(ObjectId(file_id))
         except ValueError as e:
-            logger.error(f"Invalid file ID format: {str(e)}")
-            raise HTTPException(status_code=400, detail="Invalid ID format")
+            logger.error("Invalid file ID format: %s", str(e))
+            error_message = "Invalid ID format"
+            raise HTTPException(status_code=400, detail=error_message) from e
 
         # Get file metadata
         file_metadata = grid_out.metadata
@@ -620,10 +636,10 @@ async def download_file_from_filesystem(file_id: str):
             },
         )
     except Exception as e:
-        logger.error(f"Error in download: {str(e)}")
+        logger.error("Error in download: %s", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to download file: " + str(e)
-        )
+        ) from e
 
 
 # Debug endpoint to check database contents
@@ -638,7 +654,7 @@ async def debug_db_check(user_id: str = Query(...)):
             "user_items": [str(item["_id"]) for item in user_items],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # Debug endpoint to check user existence
@@ -655,10 +671,21 @@ async def debug_check_user(user_id: str):
             "email": user["email"],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 class ImageProcessRequest(BaseModel):
+    """Request model for image processing endpoint.
+
+    This model represents the data required to process multiple images
+    into a PDF document.
+
+    Attributes:
+        images (List[bytes]): List of image data in bytes format
+        filename (str): Name for the output PDF file
+        user_id (str): ID of the user creating the PDF
+    """
+
     images: List[bytes]
     filename: str
     user_id: str
@@ -682,7 +709,7 @@ async def process_images(request: ImageProcessRequest):
         os.makedirs("temp", exist_ok=True)
 
         # Process images and create PDF
-        file_id = await ProcessImagesIntoPDF(
+        file_id = await process_images_into_pdf(
             request.images, request.filename, request.user_id
         )
 
@@ -693,5 +720,5 @@ async def process_images(request: ImageProcessRequest):
         }
 
     except Exception as e:
-        logger.error(f"Failed to process images: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Failed to process images: %s", str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

@@ -63,7 +63,7 @@ def load_image_from_data(image_data: bytes) -> np.ndarray:
             raise ValueError("Failed to decode image data")
         return image
     except Exception as e:
-        raise ValueError(f"Error loading image data: {str(e)}")
+        raise ValueError(f"Error loading image data: {str(e)}") from e
 
 
 def load_image(image_path: str) -> np.ndarray:
@@ -84,7 +84,7 @@ def load_image(image_path: str) -> np.ndarray:
     return image
 
 
-def ShowImage(image: np.ndarray, title: str = "Image") -> None:
+def show_image(image: np.ndarray, title: str = "Image") -> None:
     """Display an image in a window.
 
     Args:
@@ -96,7 +96,7 @@ def ShowImage(image: np.ndarray, title: str = "Image") -> None:
     cv2.destroyAllWindows()
 
 
-def ConvertToGray(image: np.ndarray) -> np.ndarray:
+def convert_to_gray(image: np.ndarray) -> np.ndarray:
     """Convert an image to grayscale. Created for readability.
 
     Args:
@@ -108,7 +108,7 @@ def ConvertToGray(image: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
 
-def ApplyGaussianBlur(
+def apply_gaussian_blur(
     image: np.ndarray, kernel_size: int = 5, sigma: float = 0
 ) -> np.ndarray:
     """Apply Gaussian blur to an image. Created for readability.
@@ -124,7 +124,7 @@ def ApplyGaussianBlur(
     return cv2.GaussianBlur(image, (kernel_size, kernel_size), sigma)
 
 
-def ApplyCannyEdgeDetection(
+def apply_canny_edge_detection(
     image: np.ndarray, threshold1: int, threshold2: int
 ) -> np.ndarray:
     """Apply Canny edge detection to an image. Created for readability.
@@ -140,7 +140,7 @@ def ApplyCannyEdgeDetection(
     return cv2.Canny(image, threshold1, threshold2)
 
 
-def ImageClosing(
+def image_closing(
     image: np.ndarray,
     kernel_size: int = 5,
     dil_iteration: int = 3,
@@ -158,12 +158,12 @@ def ImageClosing(
         np.ndarray: Processed image after closing operation.
     """
     kernel = np.ones((kernel_size, kernel_size))
-    newImage = cv2.dilate(image, kernel, iterations=dil_iteration)
-    newImage = cv2.erode(newImage, kernel, iterations=ero_iteration)
-    return newImage
+    new_image = cv2.dilate(image, kernel, iterations=dil_iteration)
+    new_image = cv2.erode(new_image, kernel, iterations=ero_iteration)
+    return new_image
 
 
-def contourCoordinateReordering(points: np.ndarray) -> np.ndarray:
+def contour_coordinate_reordering(points: np.ndarray) -> np.ndarray:
     """Reorder contour points in a specific order. Created for readability.
 
     Reorders points to top-left, top-right, bottom-right, bottom-left order.
@@ -176,19 +176,19 @@ def contourCoordinateReordering(points: np.ndarray) -> np.ndarray:
     """
     points = points.reshape(4, 2)
 
-    orderedPoints = np.zeros((4, 2), dtype=np.float32)
-    summ = points.sum(axis=1)
-    diff = np.diff(points, axis=1)
+    ordered_points = np.zeros((4, 2), dtype=np.float32)
+    sum_points = points.sum(axis=1)
+    diff_points = np.diff(points, axis=1)
 
-    orderedPoints[0] = points[np.argmin(summ)]
-    orderedPoints[1] = points[np.argmin(diff)]
-    orderedPoints[2] = points[np.argmax(summ)]
-    orderedPoints[3] = points[np.argmax(diff)]
-    orderedPoints = orderedPoints.reshape((4, 1, 2))
-    return orderedPoints
+    ordered_points[0] = points[np.argmin(sum_points)]
+    ordered_points[1] = points[np.argmin(diff_points)]
+    ordered_points[2] = points[np.argmax(sum_points)]
+    ordered_points[3] = points[np.argmax(diff_points)]
+    ordered_points = ordered_points.reshape((4, 1, 2))
+    return ordered_points
 
 
-def BiggestContour(image: np.ndarray) -> np.ndarray:
+def biggest_contour(image: np.ndarray) -> np.ndarray:
     """Find the largest 4 point contour in an image. Created for readability.
 
     Args:
@@ -197,26 +197,26 @@ def BiggestContour(image: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Points of the largest 4 point contour.
     """
-    countourInputs = (image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    contours, _ = cv2.findContours(*countourInputs)
+    contour_inputs = (image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(*contour_inputs)
 
     # deal with curves
     contours = [cv2.convexHull(contour) for contour in contours]
-    biggestContour = np.array({})
-    maxArea = 0
+    largest_contour = np.array({})
+    max_area = 0
     for contour in contours:
         area = cv2.contourArea(contour)
         perimeter = cv2.arcLength(contour, True)
         epsilon = 0.1 * perimeter
         approx = cv2.approxPolyDP(contour, epsilon, True)
-        if area > maxArea and len(approx) == 4:
-            biggestContour = approx
-            maxArea = area
-    biggestContour = contourCoordinateReordering(biggestContour)
-    return biggestContour
+        if area > max_area and len(approx) == 4:
+            largest_contour = approx
+            max_area = area
+    largest_contour = contour_coordinate_reordering(largest_contour)
+    return largest_contour
 
 
-def GetMMatrix(source: np.ndarray, destination: np.ndarray) -> np.ndarray:
+def get_m_matrix(source: np.ndarray, destination: np.ndarray) -> np.ndarray:
     """Calculate the perspective transform matrix. Created for readability.
 
     Args:
@@ -229,7 +229,7 @@ def GetMMatrix(source: np.ndarray, destination: np.ndarray) -> np.ndarray:
     return cv2.getPerspectiveTransform(source, destination)
 
 
-def WarpPerspective(
+def warp_perspective(
     image: np.ndarray, points: np.ndarray, w: int = 2590, h: int = 3340
 ) -> np.ndarray:
     """Apply perspective transformation to an image. Created for readability.
@@ -246,7 +246,101 @@ def WarpPerspective(
     return cv2.warpPerspective(image, points, (w, h))
 
 
-def ScanDocument(
+def _process_scanned_image(image: np.ndarray, option: int) -> np.ndarray:
+    """Process a scanned image according to the specified option.
+
+    Args:
+        image (np.ndarray): Input image to process
+        option (int): Processing option:
+            0: Colored output
+            1: Grayscale output
+            2: Binary output
+
+    Returns:
+        np.ndarray: Processed image
+    """
+    if option == 0:
+        return image
+    if option == 1:
+        return convert_to_gray(image)
+    # option == 2
+    gray = convert_to_gray(image)
+    denoised = cv2.medianBlur(gray, 3)
+    blurred = apply_gaussian_blur(denoised)
+    brightness = 3
+    block_size = 13
+    return cv2.adaptiveThreshold(
+        blurred,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        block_size,
+        brightness,
+    )
+
+
+def _load_image_from_input(img: Union[str, bytes, np.ndarray]) -> np.ndarray:
+    """Load an image from various input types.
+
+    Args:
+        image_input: Can be one of:
+            - str: Path to the input image
+            - bytes: Raw image data
+            - np.ndarray: Already loaded image array
+
+    Returns:
+        np.ndarray: Loaded image
+
+    Raises:
+        ValueError: If the input type is invalid
+    """
+    if isinstance(img, str):
+        return load_image(img)
+    if isinstance(img, bytes):
+        return load_image_from_data(img)
+    if isinstance(img, np.ndarray):
+        return img
+    raise ValueError("Invalid image input type")
+
+
+def _preprocess_image(img: np.ndarray, thres1: int, thres2: int) -> np.ndarray:
+    """Preprocess an image for document scanning.
+
+    Args:
+        image (np.ndarray): Input image
+        thres1 (int): Threshold1 for Edge detection
+        thres2 (int): Threshold2 for Edge detection
+
+    Returns:
+        np.ndarray: Preprocessed image
+    """
+    prep_image = convert_to_gray(img)
+    prep_image = apply_gaussian_blur(prep_image)
+    prep_image_edges = apply_canny_edge_detection(prep_image, thres1, thres2)
+    return image_closing(prep_image_edges)
+
+
+def _get_perspective_transform(
+    image: np.ndarray, width: int, height: int
+) -> np.ndarray:
+    """Calculate the perspective transform matrix for the image.
+
+    Args:
+        image (np.ndarray): Input image
+        width (int): Output image width
+        height (int): Output image height
+
+    Returns:
+        np.ndarray: Perspective transform matrix
+    """
+    big_contour = biggest_contour(image)
+    return get_m_matrix(
+        np.float32(big_contour),
+        np.float32([[0, 0], [width, 0], [width, height], [0, height]]),
+    )
+
+
+def scan_document(
     image_input: Union[str, bytes, np.ndarray],
     thres1: int = 45,
     thres2: int = 125,
@@ -278,51 +372,20 @@ def ScanDocument(
         ValueError: If the input image cannot be loaded.
     """
     try:
-        if isinstance(image_input, str):
-            image = load_image(image_input)
-        elif isinstance(image_input, bytes):
-            image = load_image_from_data(image_input)
-        elif isinstance(image_input, np.ndarray):
-            image = image_input
-        else:
-            raise ValueError("Invalid image input type")
+        # Load and process the image
+        image = _load_image_from_input(image_input)
+        processed = _preprocess_image(image, thres1, thres2)
+        m_matrix = _get_perspective_transform(processed, width, height)
 
-        grayImage = ConvertToGray(image)
-        grayImageBlur = ApplyGaussianBlur(grayImage)
-        grayImageEdges = ApplyCannyEdgeDetection(grayImageBlur, thres1, thres2)
-        grayImageEdgesClosing = ImageClosing(grayImageEdges)
-        bigContour = BiggestContour(grayImageEdgesClosing)
-        mMatrix = GetMMatrix(
-            np.float32(bigContour),
-            np.float32([[0, 0], [width, 0], [width, height], [0, height]]),
-        )
-
-        if option == 0:
-            paper = WarpPerspective(image, mMatrix, width, height)
-        elif option == 1:
-            paper = WarpPerspective(grayImage, mMatrix, width, height)
-        else:  # option == 2
-            paper = WarpPerspective(grayImage, mMatrix, width, height)
-            denoisedImage = cv2.medianBlur(paper, 3)
-            blurredDenoisedImage = ApplyGaussianBlur(denoisedImage)
-            brightness = 3
-            blockSize = 13
-            binary = cv2.adaptiveThreshold(
-                blurredDenoisedImage,
-                255,
-                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                cv2.THRESH_BINARY,
-                blockSize,
-                brightness,
-            )
-            paper = binary
-        return paper
+        # Apply perspective transformation and process according to option
+        warped = warp_perspective(image, m_matrix, width, height)
+        return _process_scanned_image(warped, option)
 
     except Exception as e:
-        raise ValueError(f"Error processing image: {str(e)}")
+        raise ValueError(f"Error processing image: {str(e)}") from e
 
 
-def LoadImageFromBase64(base64_string: str) -> np.ndarray:
+def load_image_from_base64(base64_string: str) -> np.ndarray:
     """Load an image from a base64 string.
 
     Args:
@@ -347,10 +410,10 @@ def LoadImageFromBase64(base64_string: str) -> np.ndarray:
             raise ValueError("Failed to decode image data")
         return image
     except Exception as e:
-        raise ValueError(f"Error loading image data: {str(e)}")
+        raise ValueError(f"Error loading image data: {str(e)}") from e
 
 
-async def ProcessImagesIntoPDF(
+async def process_images_into_pdf(
     image_list: List[str], output_filename: str, user_id: str
 ) -> str:
     """Process multiple images and combine them into a PDF file.
@@ -365,11 +428,13 @@ async def ProcessImagesIntoPDF(
 
     Raises:
         ValueError: If processing fails
+        OSError: If file operations fail
+        RuntimeError: If PDF creation fails
     """
     processed_images = []
     try:
-        logger.debug(f"Starting PDF generation for user {user_id}")
-        logger.debug(f"Number of images to process: {len(image_list)}")
+        logger.debug("Starting PDF generation for user %s", user_id)
+        logger.debug("Number of images to process: %d", len(image_list))
 
         # Create temp directory if it doesn't exist
         os.makedirs("temp", exist_ok=True)
@@ -378,34 +443,34 @@ async def ProcessImagesIntoPDF(
         # Process each image and save as individual files
         for idx, base64_img in enumerate(image_list):
             try:
-                logger.debug(f"Processing image {idx + 1}")
+                logger.debug("Processing image %d", idx + 1)
                 # Load and scan the image
-                img_data = LoadImageFromBase64(base64_img)
-                logger.debug(f"Image {idx + 1} loaded from base64")
+                img_data = load_image_from_base64(base64_img)
+                logger.debug("Image %d loaded from base64", idx + 1)
 
-                processed_img = ScanDocument(img_data, option=2)
-                logger.debug(f"Image {idx + 1} processed")
+                processed_img = scan_document(img_data, option=2)
+                logger.debug("Image %d processed", idx + 1)
 
                 # Save processed image as temporary file
-                t_img_path = f"temp/{user_id}_temp_{idx}.jpg"
+                temp_path = f"temp/{user_id}_temp_{idx}.jpg"
                 success = cv2.imwrite(
-                    t_img_path, processed_img, [cv2.IMWRITE_JPEG_QUALITY, 95]
+                    temp_path, processed_img, [cv2.IMWRITE_JPEG_QUALITY, 95]
                 )
                 if not success:
                     raise ValueError(f"Failed to save temp. image {idx + 1}")
 
-                processed_images.append(t_img_path)
-                logger.debug(f"Image {idx + 1} saved to {t_img_path}")
-            except Exception as e:
-                logger.error(f"Error processing image {idx + 1}: {str(e)}")
-                raise
+                processed_images.append(temp_path)
+                logger.debug("Image %d saved to %s", idx + 1, temp_path)
+            except ValueError as e:
+                logger.error("Error processing image %d: %s", idx + 1, str(e))
+                raise ValueError(f"Error processing image {idx + 1}") from e
 
         if not processed_images:
             raise ValueError("No images were successfully processed")
 
         # Create PDF path
         temp_pdf_path = f"temp/{user_id}_{output_filename}"
-        logger.debug(f"Attempting to create PDF at {temp_pdf_path}")
+        logger.debug("Attempting to create PDF at %s", temp_pdf_path)
 
         # Convert images to PDF using img2pdf
         try:
@@ -451,38 +516,42 @@ async def ProcessImagesIntoPDF(
             # Insert into file system collection
             logger.debug("Creating file system entry")
             result = await file_system.insert_one(file_item)
-            logger.debug("Created with ID:" + str(result.inserted_id))
+            logger.debug("Created with ID: %s", str(result.inserted_id))
 
-        except Exception as e:
-            logger.error(f"Error during PDF creation: {str(e)}")
-            raise ValueError(f"Failed to create PDF: {str(e)}")
+        except (OSError, RuntimeError, ValueError) as e:
+            logger.error("Error during PDF creation: %s", str(e))
+            raise ValueError(f"Failed to create PDF: {str(e)}") from e
 
         # Clean up temporary files
         for temp_file in processed_images:
             try:
                 os.remove(temp_file)
-                logger.debug(f"Cleaned up temporary file: {temp_file}")
-            except Exception as e:
+                logger.debug("Cleaned up temporary file: %s", temp_file)
+            except OSError as cleanup_error:
                 logger.warning(
-                    f"Failed to clean up temporary file {temp_file}: {str(e)}"
+                    "Failed to clean up temporary file %s: %s",
+                    temp_file,
+                    str(cleanup_error),
                 )
 
         try:
             os.remove(temp_pdf_path)
             logger.debug("Cleaned up temporary PDF file")
-        except Exception as e:
-            logger.warning(f"Failed to clean up temporary PDF file: {str(e)}")
+        except OSError as e:
+            logger.warning("Failed to clean up temporary PDF file: %s", str(e))
 
         logger.debug("PDF generation completed successfully")
         return str(result.inserted_id)
-    except Exception as e:
-        logger.error(f"Error in ProcessImagesIntoPDF: {str(e)}")
+    except (ValueError, OSError, RuntimeError) as e:
+        logger.error("Error in ProcessImagesIntoPDF: %s", str(e))
         # Clean up any temporary files in case of error
         for temp_file in processed_images:
             try:
                 os.remove(temp_file)
-            except Exception as e:
+            except OSError as cleanup_error:
                 logger.warning(
-                    f"Failed to clean up temporary file {temp_file}: {str(e)}"
+                    "Failed to clean up temporary file %s: %s",
+                    temp_file,
+                    str(cleanup_error),
                 )
-        raise ValueError(f"Error creating PDF: {str(e)}")
+        raise ValueError(f"Error creating PDF: {str(e)}") from e

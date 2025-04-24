@@ -45,7 +45,7 @@ pip install -r requirements.txt || handle_error "Failed to install requirements"
 
 # Run tests
 print_section "Running tests"
-python tests/testImageScan.py || handle_error "Tests failed"
+python tests/test_image_scan.py || handle_error "Tests failed"
 
 # Deactivate virtual environment
 print_section "Tests completed"
